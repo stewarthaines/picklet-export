@@ -1,0 +1,7 @@
+picklet-export
+
+2011-04-19
+
+This repository gathers scripts for image editing applications to facilitate the creation of image files to be used in the Picklet Builder web app. See http://picklet.net for more information.
+
+Currently the only functional export script is for Adobe Photoshop CS3.
