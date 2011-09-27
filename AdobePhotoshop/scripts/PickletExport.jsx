@@ -352,7 +352,7 @@ if (!JSON) {
 
 // UI strings to be localized
 var strShortcutBinding = "A PickletExport action has been added to the Actions panel. It is strongly advised that you bind this action to a function key to run it easily. (To do this, double-click in the space right of the 'PickletExport' action in the Actions panel and select a Function Key.)";
-var strRevisionNumber = "r7";
+var strRevisionNumber = "r12";
 var strScriptName = "PickletExport.jsx";
 var strCopyrightNotice = "by RobotInaBox";
 var strTitle = "Picklet Export";
@@ -363,8 +363,8 @@ var strHelpText = "Specify the destination for all layer comp folders. Layer nam
 var strLabelDestination = "Export to destination:";
 var strButtonBrowse = "&Browse...";
 var strLabelFileNamePrefix = "File Name Prefix:";
-var strCheckboxSelectionOnly = "Export &Selected Layer Comps Only";
-var strCheckboxExportThumbnails = "Export &Thumbnails";
+var strCheckboxSelectionOnly = "Export &Selected Layer Comp Only";
+var strCheckboxExportThumbnails = "Export Panel &Thumbnails";
 var strLabelFileType = "File Type:";
 var strCheckboxIncludeICCProfile = "&Include ICC Profile";
 var strJPEGOptions = "JPEG Options:";
@@ -386,8 +386,8 @@ var strPDFOptions = "PDF Options:";
 var strAlertSpecifyDestination = "Please specify destination.";
 var strAlertDestinationNotExist = "Destination does not exist.";
 var strTitleSelectDestination = "Select Destination";
-var strAlertDocumentMustBeOpened = "You must have a document open to export!";
-var strAlertNoLayerCompsFound = "No layer comps found in document!";
+var strAlertDocumentMustBeOpened = "You must have a document open to export.";
+var strAlertNoLayerCompsFound = "No layer comps found in document.";
 var strAlertWasSuccessful = " was successful.";
 var strUnexpectedError = "Unexpected error";
 var strMessage = "Picklet Export Layer Comps To Folders action settings";
@@ -396,6 +396,9 @@ var stretQuality = "30";
 var stretDestination = "300";
 var strddFileType = "100";
 var strpnlOptions = "100";
+var output_log = "";
+var output_status = { 'saved': [], 'failed': [] };
+var files_saved = {};
 
 var bmpIndex = 0;
 var jpegIndex = 1;
@@ -498,6 +501,33 @@ function slugify(s)
   return slug;
 }
 
+// returns a string representation of the layer's color property
+// (as set in the layers panel)
+function getLayerPropertiesColor() {
+  var ref = new ActionReference(); 
+  ref.putEnumerated( charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt") ); 
+  var desc = executeActionGet(ref); 
+  var idClr = charIDToTypeID( "Clr " );
+  var idClr = charIDToTypeID( "Clr " );
+  var theColor = typeIDToStringID(desc.getEnumerationValue(idClr, idClr));
+  // alert (theColor);
+  return desc.getEnumerationValue(idClr, idClr); // theColor;
+}
+
+// open a url in the default browser
+function openURL(url) {
+  var fname = "shortcut.url";
+  var shortcut = new File(Folder.temp + '/' + fname);
+  shortcut.open('w');
+  shortcut.writeln('[InternetShortcut]');
+  shortcut.writeln('URL=' + url);
+  shortcut.writeln();
+  shortcut.close();
+  shortcut.execute();
+  $.sleep(100); // not sure about this. mac os x 10.6 needed it.
+  shortcut.remove();
+};
+
 function export_cover() {
   var docRef = duplicateRef;
   var compRef;
@@ -517,6 +547,9 @@ function export_cover() {
 
   filenameSuffix = '@2x';
   filenamePrefix = '';
+  if (docRef.width > retinaPickletWidth || docRef.height > retinaPickletHeight) {
+    docRef.resizeImage(retinaPickletWidth, retinaPickletHeight);
+  }
   saveFile(docRef, 'cover', exportInfo);
 
   filenameSuffix = '';
@@ -539,7 +572,7 @@ function export_layers() {
   var compsCount = docRef.layerComps.length;
   for (compsIndex = 0; compsIndex < compsCount; compsIndex++) {
 
-    var compRef = docRef.layerComps[compsIndex];
+    var compRef = duplicateRef.layerComps[compsIndex];
 
     if (exportInfo.selectionOnly && !compRef.selected) continue; // selected only
 
@@ -551,10 +584,23 @@ function export_layers() {
       continue;
     } else {
       try {
-        layerSet = docRef.layerSets[name].layers;
+        layerSet = duplicateRef.layerSets[name].layers;
       } catch(e) {
         alert("No Layer Set matching Layer Comp named '" + name + "' found.");
         return "cancel";
+      }
+    }
+
+    // make another copy of the duplicateRef because we're going to 
+    // delete some layers from it each time through this loop
+    docRef = duplicateRef.duplicate();
+
+    layerSet = docRef.layerSets[name].layers;
+
+    // delete other layerSets than the one being exported (optimisation for speed)
+    for (var otherLayer = docRef.layerSets.length - 1; otherLayer >= 0; otherLayer--) {
+      if (name != docRef.layerSets[otherLayer].name) {
+        docRef.layerSets[otherLayer].remove();
       }
     }
 
@@ -573,10 +619,13 @@ function export_layers() {
     //var compRef = docRef.layerComps[name];
     compRef.apply();
 
+    // app.activeDocument = docRef;
+
     var layerIndex;
     for (layerIndex = 0; layerIndex < layerSet.length; layerIndex++) {
 
         app.activeDocument = docRef;
+
         //docRef.selection.selectAll();
         //app.activeDocument.selection.copy();
         //var SB = activeDocument.selection.bounds;
@@ -630,6 +679,7 @@ function export_layers() {
         //newDocRef.layers['Background'].remove();
         //newDocRef.layers[0].applyStyle('Purple and Magenta');
     }
+    docRef.close(SaveOptions.DONOTSAVECHANGES);
   }
 }
 
@@ -744,7 +794,7 @@ function exportSelectedLayers() {
     }
   }
 
-  duplicateRef.resizeImage(basePickletWidth, basePickletHeight);
+  // duplicateRef.resizeImage(basePickletWidth, basePickletHeight);
 
   var l = duplicateRef.activeLayer;
   var SB = duplicateRef.activeLayer.bounds;
@@ -759,12 +809,13 @@ function exportSelectedLayers() {
     SB = duplicateRef.activeLayer.bounds;
     l.translate(-SB[0], -SB[1]);
 
-    filename = panel_name + '/' + slugify(duplicateRef.activeLayer.name);
+    filename = panel_name + '/' + filenamePrefix + slugify(duplicateRef.activeLayer.name);
     message = 'saved: ' + filename + '.png';
 
     saveFile(duplicateRef, filename, exportInfo);
   }
 
+/*
   if (DialogModes.ALL == app.playbackDisplayDialogs) {
     // only display the dialog if user hasn't selected 'toggle dialog on' in actions panel
     dlgLayers = new Window("dialog", "Export selected layers");
@@ -772,6 +823,7 @@ function exportSelectedLayers() {
     dlgLayers.message = dlgLayers.add("statictext", undefined, message, {
         multiline: true
     });
+    dlgLayers.message.preferredSize.width = 700;
 
     dlgLayers.btnCancel = dlgLayers.add("button", undefined, "Close");
     dlgLayers.btnCancel.onClick = function() {
@@ -788,6 +840,59 @@ function exportSelectedLayers() {
   } else {
     return;
   }
+  */
+}
+
+function displayExportLog() {
+  dlgExportLog = new Window("dialog", "PickletExport log");
+
+  dlgExportLog.orientation = 'column';
+  dlgExportLog.alignChildren = 'left';
+
+  var output_msg = '';
+  output_msg += 'Saved layers\n---------------------------\n';
+  for (var m in output_status['saved']) {
+    output_msg += output_status['saved'][m] + '\n';
+  }
+  if (output_status['failed'].length > 0) {
+    output_msg += '\nIssues to be resolved\n---------------------------\n';
+  }
+  for (var m in output_status['failed']) {
+    output_msg += output_status['failed'][m] + '\n';
+  }
+  
+  // check that the proportions of the document are close to iPhone ratio
+  if (Math.pow((app.activeDocument.height / app.activeDocument.width) - 1.5, 2) > 0.001) {
+    output_msg += '\n\nWARNING: document does not have iPhone screen ratio. (320x480)';
+  }
+
+  dlgExportLog.etHelp = dlgExportLog.add("edittext", undefined, output_msg, {
+      multiline: true
+  });
+  dlgExportLog.etHelp.alignment = 'fill';
+  dlgExportLog.etHelp.preferredSize.width = 700;
+  dlgExportLog.etHelp.preferredSize.height = 400;
+
+  dlgExportLog.grpFourthLine = dlgExportLog.add("group");
+  dlgExportLog.grpFourthLine.orientation = 'row';
+  dlgExportLog.grpFourthLine.alignChildren = 'right';
+  dlgExportLog.grpFourthLine.alignment = 'right';
+
+  dlgExportLog.btnCancel = dlgExportLog.grpFourthLine.add("button", undefined, 'Close');
+  dlgExportLog.btnCancel.onClick = function() {
+      dlgExportLog.close(cancelButtonID);
+  };
+
+  dlgExportLog.defaultElement = dlgExportLog.btnCancel;
+  dlgExportLog.cancelElement = dlgExportLog.btnCancel;
+
+  var result = dlgExportLog.show();
+
+  if (cancelButtonID == result) {
+      return result;
+      // close to quit
+  }
+
 }
 
 function createPicklet() {
@@ -984,9 +1089,11 @@ function initPickletFromDoc(docRef, docName) {
       layer.width = width; //Math.floor(width);
       layer.height = height; //Math.floor(height);
       // layer.start_x = SB[0] + ', ' + SB[1] + ', ' + SB[2] + ', ' + SB[3]; //Math.floor(width / 2);
-      layer.start_x = SB[0].as('px') + Math.floor(layer.width / 2);
+// alert(Number(layerSet[layerIndex].bounds[1]));
+// alert(SB[2].value);
+      layer.start_x = Number(SB[0]) + Math.floor(layer.width / 2);
       // layer.start_y = Math.floor(SB[1] + Math.floor(height / 2));
-      layer.start_y = SB[1].as('px') + Math.floor(layer.height / 2);
+      layer.start_y = Number(SB[1]) + Math.floor(layer.height / 2);
       // layer.end_x = layer.start_x;
       // layer.end_y = layer.start_y;
       layer.origin_x = Math.floor(width / 2);
@@ -1044,13 +1151,32 @@ function main() {
     // pre-flight check that we can export files
     // if there's at least one selected layer export only that one
     if (DialogModes.ERROR == app.playbackDisplayDialogs) {
+      // var destination = dlgMain.etDestination.text;
+      
+      if (typeof exportInfo.destination == 'undefined' || exportInfo.destination == '') {
+        // bail out if the destination folder isn't set
+        // notify user of likely cause of error
+        alert('No destination set for layer export\nSet \'Toggle dialog\' to \'on\' in the Actions panel to configure export options.');
+        return;
+      }
       if (app.activeDocument.activeLayer.parent.typename == 'LayerSet') {
+        if (exportInfo.exportSelectedFullsize) {
+          // save fullsize selected layer
+          duplicateRef = app.activeDocument.duplicate();
+          filenamePrefix = 'x2/';
+          duplicateRef.suspendHistory('Picklet Export', 'exportSelectedLayers()');
+          app.activeDocument = originalDocument;
+          duplicateRef.close(SaveOptions.DONOTSAVECHANGES);
+        }
+
         duplicateRef = app.activeDocument.duplicate();
         duplicateRef.resizeImage(basePickletWidth, basePickletHeight);
+        filenamePrefix = '';
         duplicateRef.suspendHistory('Picklet Export', 'exportSelectedLayers()');
         app.activeDocument = originalDocument;
         duplicateRef.close(SaveOptions.DONOTSAVECHANGES);
         // exportSelectedLayers();
+        
         restorePrefs();
       }
       return;
@@ -1060,7 +1186,8 @@ function main() {
   if ( DialogModes.ALL == app.playbackDisplayDialogs | DialogModes.ERROR == app.playbackDisplayDialogs) {
     if (cancelButtonID == settingDialog(exportInfo)) {
       restorePrefs();
-      return 'cancel'; // quit, returning 'cancel' (dont localize) makes the actions palette not record our script
+      return;
+      //return 'cancel'; // quit, returning 'cancel' (dont localize) makes the actions palette not record our script
     }
   }
 
@@ -1117,23 +1244,30 @@ function main() {
   duplicateRef = originalDocument.duplicate();
   duplicateRef.resizeImage(basePickletWidth, basePickletHeight);
   duplicateRef.suspendHistory('Picklet Export', 'export_layers()');
+  duplicateRef.close(SaveOptions.DONOTSAVECHANGES);
 
   if (exportInfo.savePickletTemplate) {
     // create a picklet.json file in the selected directory
     var pickletText = new File(toplevelFolder + '/picklet.json');
     pickletText.open('w');
+    duplicateRef = originalDocument.duplicate();
+    duplicateRef.resizeImage(basePickletWidth, basePickletHeight);
     var picklet = initPickletFromDoc(duplicateRef, originalDocument.name); //{ "name": "new picklet", "author": "Stewart Haines" };
     // var picklet = initPickletFromDoc(originalDocument, originalDocument.name); //{ "name": "new picklet", "author": "Stewart Haines" };
     var output = unescape(JSON.stringify(picklet, null, 2).replace(/\\u/g, '%u'));
     pickletText.write(output);
     pickletText.close();
+    duplicateRef.close(SaveOptions.DONOTSAVECHANGES);
   }
 
-  duplicateRef.close(SaveOptions.DONOTSAVECHANGES);
 
   if (exportInfo.saveRetinaResolution) {
     // export retina resolution layers
     duplicateRef = originalDocument.duplicate();
+    // resize to retina dimensions, if original document is larger
+    if (duplicateRef.width > retinaPickletWidth || duplicateRef.height > retinaPickletHeight) {
+      duplicateRef.resizeImage(retinaPickletWidth, retinaPickletHeight);
+    }
     // filenameSuffix = '@2x';
     filenamePrefix = 'x2/';
     duplicateRef.suspendHistory('Picklet Export', 'export_layers()');
@@ -1156,6 +1290,18 @@ function main() {
     duplicateRef.suspendHistory('Picklet Export Cover', 'export_cover()');
     duplicateRef.close(SaveOptions.DONOTSAVECHANGES);
   }
+
+  // write a log file of the export activity
+  var exportLog = new File(toplevelFolder + '/export.log');
+  exportLog.open('w');
+  exportLog.write(output_log);
+  exportLog.close();
+
+  // display export log messages if dialogs are enabled
+  if ( DialogModes.NO != app.playbackDisplayDialogs ) {
+    displayExportLog();
+  }
+
   restorePrefs();
 };
 
@@ -1214,20 +1360,50 @@ function settingDialog(exportInfo)
         return 'cancel';
     };
 
-    dlgMain.btnLayerExport = dlgMain.add("button", undefined, "Export Selected Layer");
+    dlgMain.grpExportSelected = dlgMain.add("group");
+    dlgMain.grpExportSelected.orientation = 'row';
+    dlgMain.grpExportSelected.alignChildren = 'left';
+    dlgMain.grpExportSelected.alignment = 'fill';
+    dlgMain.btnLayerExport = dlgMain.grpExportSelected.add("button", undefined, "Export Selected Layer");
+    dlgMain.cbExportFullsize = dlgMain.grpExportSelected.add("checkbox", undefined, "Fullsize");
+    dlgMain.cbExportFullsize.value = exportInfo.exportSelectedFullsize;
+
     dlgMain.btnLayerExport.onClick = function() {
+      exportInfo.exportSelectedFullsize = dlgMain.cbExportFullsize.value;
       dlgMain.close(cancelButtonID);
       if (app.activeDocument.activeLayer.parent.typename == 'LayerSet') {
+        if (exportInfo.exportSelectedFullsize) {
+          // save fullsize selected layer
+          duplicateRef = app.activeDocument.duplicate();
+          filenamePrefix = 'x2/';
+          duplicateRef.suspendHistory('Picklet Export', 'exportSelectedLayers()');
+          app.activeDocument = originalDocument;
+          duplicateRef.close(SaveOptions.DONOTSAVECHANGES);
+        }
+
         duplicateRef = app.activeDocument.duplicate();
         duplicateRef.resizeImage(basePickletWidth, basePickletHeight);
+        filenamePrefix = '';
         duplicateRef.suspendHistory('Picklet Export', 'exportSelectedLayers()');
         app.activeDocument = originalDocument;
         duplicateRef.close(SaveOptions.DONOTSAVECHANGES);
         // exportSelectedLayers();
+
+        // remember settings related to fullsize export.
+        var d = objectToDescriptor(exportInfo, preProcessExportInfo);
+        d.putString( app.charIDToTypeID( 'Msge' ), strMessage );
+        app.putCustomOptions("Picklet-Export-settings-" + app.activeDocument.fullName, d);
+        
+        // display export log messages if dialogs are enabled
+        if ( DialogModes.NO != app.playbackDisplayDialogs ) {
+          displayExportLog();
+        }
+
         restorePrefs();
         return 'cancel';
       }
     };
+    
 /*
     dlgMain.btnActionCreate = dlgMain.add("button", undefined, "Create an Action for this script");
     dlgMain.btnActionCreate.onClick = function() {
@@ -1303,6 +1479,9 @@ function settingDialog(exportInfo)
 
     dlgMain.cbPickletTemplate = dlgMain.grpThirdLine.add("checkbox", undefined, strPickletTemplate);
     dlgMain.cbPickletTemplate.value = exportInfo.savePickletTemplate;
+    
+    dlgMain.cbExportOrangeAs8Bit = dlgMain.grpThirdLine.add("checkbox", undefined, "Export Orange layers as 8bit PNG files");
+    dlgMain.cbExportOrangeAs8Bit.value = exportInfo.exportOrangeAs8Bit;
 
     // -- the fourth line in the dialog
     // dlgMain.etFileNamePrefix = dlgMain.grpTopLeft.add("edittext", undefined, exportInfo.fileNamePrefix.toString());
@@ -1554,6 +1733,11 @@ function settingDialog(exportInfo)
     // dlgMain.grpTopRight.orientation = 'column';
     // dlgMain.grpTopRight.alignChildren = 'fill';
 
+    dlgMain.btnDocs = dlgMain.grpFourthLine.add("button", undefined, "Browse documentation");
+    dlgMain.btnDocs.onClick = function() {
+      openURL('http://picklet.net/picklet-export/');
+    };
+
     dlgMain.btnRun = dlgMain.grpFourthLine.add("button", undefined, strButtonRun);
     dlgMain.btnRun.onClick = function() {
         // check if the setting is properly
@@ -1595,6 +1779,7 @@ function settingDialog(exportInfo)
 
     dlgMain.copyright = dlgMain.grpBottom.add("statictext", undefined, strScriptName + " " + strRevisionNumber + " " + strCopyrightNotice);
 
+
     dlgMain.onShow = function() {
         // dlgMain.ddFileType.onChange();
     };
@@ -1619,6 +1804,9 @@ function settingDialog(exportInfo)
     exportInfo.selectionOnly = dlgMain.cbSelection.value;
     exportInfo.saveRetinaResolution = dlgMain.cbRetinaResolution.value;
     exportInfo.slugify = true; //dlgMain.cbSlugify.value;
+    exportInfo.exportSelectedFullsize = dlgMain.cbExportFullsize.value;
+    exportInfo.savePickletTemplate = dlgMain.cbPickletTemplate.value;
+    exportInfo.exportOrangeAs8Bit = dlgMain.cbExportOrangeAs8Bit.value;
 
     // exportInfo.fileType = dlgMain.ddFileType.selection.index;
     // exportInfo.icc = dlgMain.cbIcc.value;
@@ -1639,10 +1827,13 @@ function initExportInfo(exportInfo)
     exportInfo.destination = new String("");
     exportInfo.fileNamePrefix = new String("untitled_");
     exportInfo.selectionOnly = false;
+    exportInfo.exportThumbnails = true;
     exportInfo.fileType = pngIndex; //psdIndex;
     exportInfo.saveRetinaResolution = true;
     exportInfo.exportCovers = true;
     exportInfo.savePickletTemplate = true;
+    exportInfo.exportSelectedFullsize = true;
+    exportInfo.exportOrangeAs8Bit = true;
     // exportInfo.icc = true;
     //exportInfo.jpegQuality = 8;
     //exportInfo.psdMaxComp = true;
@@ -1681,12 +1872,18 @@ function saveFile(docRef, fileNameBody, exportInfo)
         var filename;
         // var tempFolder = new Folder (exportInfo.destination  + "/" + filenamePrefix);
         // tempFolder.create();
-        if (fileNameBody.length >= 24) {
-          filename = toplevelFolder + "/" + fileNameBody.substring(0, 23) + filenameSuffix;
+        var lastIndex = fileNameBody.lastIndexOf('/');
+        var directory = fileNameBody.substring(0, lastIndex);
+        var filename = fileNameBody.substring(lastIndex);
+        if (filename.length >= 24) {
+          // filename = toplevelFolder + "/" + fileNameBody.substring(0, 23) + filenameSuffix;
+          filename = filename.substring(0, 23) + filenameSuffix;
         } else {
-          filename = toplevelFolder + "/" + fileNameBody + filenameSuffix;
+          // filename = toplevelFolder + "/" + fileNameBody + filenameSuffix;
+          filename = filename + filenameSuffix;
         }
-        var saveFile = new File(filename + ".png");
+        var saveFile = new File(toplevelFolder + "/" + directory + filename + ".png");
+
         pngSaveOptions = new ExportOptionsSaveForWeb();
         pngSaveOptions.format = SaveDocumentType.PNG;
         pngSaveOptions.interlaced = false;
@@ -1701,11 +1898,62 @@ function saveFile(docRef, fileNameBody, exportInfo)
           //pngSaveOptions.includeProfile = false;
           //pngSaveOptions.optimized = true;
         //} else {
-          pngSaveOptions.PNG8 = false;
+          var str8bit = '';
+          if (exportInfo.exportOrangeAs8Bit && (getLayerPropertiesColor() == '1332899431')) {
+            pngSaveOptions.PNG8 = true;
+            str8bit = ' 8bit'
+          } else {
+            pngSaveOptions.PNG8 = false;
+          }
           pngSaveOptions.transparency = true;
         //}
         if (saveFile.exists) saveFile.remove();
         docRef.exportDocument(saveFile, ExportType.SAVEFORWEB, pngSaveOptions);
+
+        var savefile_error = false;
+
+        var size_warning = '';
+        var file_size = saveFile.length;
+        if (saveFile.length > 1000000) {
+          size_warning = ' * file size must be < 1000000 Bytes';
+          //savefile_error = true;
+        }
+
+        var dimensions_warning = '';
+        var SB = docRef.activeLayer.bounds;
+        var width = parseInt(SB[2] - SB[0], 10);
+        var height = parseInt(SB[3] - SB[1], 10);
+        // output_log += '(' + parseInt(width, 10) + ', ' + parseInt(height, 10) + ')';
+        if (width*height > 3*1024*1024) {
+          dimensions_warning = ' * layer dimensions (' + width + 'x' + height + ') exceed limit (3145728)';
+          savefile_error = true;
+        }
+
+        var name_warning = '';
+        if (typeof files_saved[saveFile] != 'undefined') {
+          name_warning = ' * file removed - layer name collision'
+          files_saved[saveFile] = 'collision';
+          savefile_error = true;
+        } else {
+          files_saved[saveFile] = 'ok';
+        }
+
+        var status_message = '';
+        if (savefile_error) {
+          if (saveFile.exists) {
+            saveFile.remove();
+          }
+          status_message = 'error: ';
+          var msg = slugify(exportInfo.fileNamePrefix) + '/' + directory + filename + '.png ' + file_size + ' bytes' + size_warning + name_warning + dimensions_warning + str8bit;
+          var index = output_status['failed'].push(msg)
+        } else {
+          status_message = 'saved: ';
+          var msg = slugify(exportInfo.fileNamePrefix) + '/' + directory + filename + '.png ' + file_size + ' bytes' + size_warning + name_warning + dimensions_warning + str8bit;
+          output_status['saved'].push(msg)
+        }
+
+        output_log += status_message + exportInfo.fileNamePrefix + '/' + directory + filename + '.png ' + file_size + ' bytes' + size_warning + name_warning + dimensions_warning + str8bit + '\n';
+
         // if (fileNameBody.length >= 24) {
           // saveFile.rename(filename + filenameSuffix + ".png");
         // }
