@@ -10,5 +10,11 @@
     // optimize: "uglify",
     out: "scripts/PickletExport.jsx",
     create: true,
-    include: ["main", "ExportController", "PickletModel", "SettingsView", "json2"],
+    include: [
+      "json2",
+      "Gettext",
+      "PickletExportModel",
+      "PickletExportView",
+      "PickletExportController",
+      "main"],
 })

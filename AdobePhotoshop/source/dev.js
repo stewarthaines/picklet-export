@@ -1,15 +1,24 @@
 /*
 
-  this file exists as the entry point for developing the Photoshop script functionality.
+  This file exists as the entry point for development of
+  the Photoshop PickletExport script functionality.
  
- it uses @include to build the full set of required scripts
+ It uses @include to build the full set of required scripts
  
- it can be run directly from a Photoshop action.
+ It can be run directly from a Photoshop action.
  
- for distribution the required scripts are aggregated into a single PickletExport.jsx file by the build system
+ For distribution the required scripts are aggregated into
+ a single PickletExport.jsx file by the build system.
+
  */
 
 // @include 'json2.js'
+
+// @include 'Gettext.js'
+
+// @include 'PickletExportModel.js'
+// @include 'PickletExportView.js'
+// @include 'PickletExportController.js'
 
 // @include 'main.js'
 
