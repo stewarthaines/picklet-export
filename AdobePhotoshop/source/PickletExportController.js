@@ -36,16 +36,14 @@ PickletExportController = function() {
         layerRef.name = 'region_guide';
         layerRef.blendMode = BlendMode.NORMAL;
 
-        //      docRef.layers['status_bar'].select();
-
-        // create a black status bar
-        var shapeRef = [[0,0], [pd.width,0], [pd.width,40], [0,40]];
-        docRef.selection.select(shapeRef);
         var blackColor = new SolidColor();
         blackColor.rgb.red = 0;
         blackColor.rgb.green = 0;
         blackColor.rgb.blue = 0;
-        docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 100, false);
+
+        // create a grey status bar
+        docRef.selection.select([[0,0], [pd.width,0], [pd.width,40], [0,40]]);
+        docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 35, false);
 
         // create a block representing the nav controls
         docRef.selection.select([[0,40], [pd.width,40], [pd.width,128], [0,128]]);
@@ -53,6 +51,10 @@ PickletExportController = function() {
 
         // create a block representing the slider on home screen dimensions
         docRef.selection.select([[0,772], [pd.width,772], [pd.width,pd.height], [0,pd.height]]);
+        docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 12, false);
+        
+        // create a block representing the start position of the slider
+        docRef.selection.select([[440,772], [pd.width,772], [pd.width,pd.height], [440,pd.height]]);
         docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 25, false);
 
         docRef.selection.select([]);
