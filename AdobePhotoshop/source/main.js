@@ -8,8 +8,4 @@
 function define(name, f) {};
 
 var view = new PickletExportView();
-var controller = new PickletExportController();
-
-view.setController(controller);
-
 view.show();

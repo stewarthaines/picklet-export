@@ -37,8 +37,6 @@ PickletExportView = function() {
   
   var language_list;
   
-  var controller;
-
   var json_locale_data;
 
   var documentName = 'dummy_name';
@@ -52,7 +50,23 @@ PickletExportView = function() {
   // get the global_options language, fallback to LOCALE language
   selected_language = global_options.get('language', default_language);
 
+  var gt;
+  
+  var controller = new PickletExportController();
+
+  function _(msgid) {
+      return gt.gettext(msgid);
+  }
+
   var init = function() {
+    loadLanguage(selected_language);
+    
+    var params = {
+        "domain": "messages",
+        "locale_data": json_locale_data
+    };
+    gt = new Gettext(params);
+
     if (app.documents.length > 0) {
       if (app.activeDocument) {
         try {
@@ -66,21 +80,12 @@ PickletExportView = function() {
     document_options = new CustomOptions('Picklet-Settings-' + documentName);
     action_selection = document_options.get('action_display', 0);
 
-    var params = {
-        "domain": "messages",
-        "locale_data": json_locale_data
-    };
-    gt = new Gettext(params);
-    function _(msgid) {
-        return gt.gettext(msgid);
-    }
-
     /*
     In case you're curious, my principle in deciding how to create these
     interface elements is that it's in the resource string unless
-    a. I need to set a text label on it (for localization), or
-    b. I need to persist the value of the control (using CustomOptions)
-    In which cases I have an instance variable with the value needed
+    a. I need to persist the value of the control (using CustomOptions), or
+    b. it's an active interface element that needs a handler or something
+    in which cases I make an instance variable with the value needed
     instead of storing hierarchies.
     The compactness of the resource style appeals and lets me change layout
     quickly and easily, and it's an almost clean separation of presentation/function.
@@ -329,8 +334,7 @@ PickletExportView = function() {
         language_list.items[i].text = _(LC_LANGUAGES[i]['name']);
       }
       language_list.addEventListener('change', function(evt) {
-        var lang = language_list.selection.code;
-        selected_language = lang;
+        selected_language = language_list.selection.code;
         reset();
       });
 
@@ -348,7 +352,6 @@ PickletExportView = function() {
       put_options();
       main_window.close();
     }
-    loadLanguage(selected_language);
     init(); // need to recreate the controls so autolayout works
     main_window.show();
   };
@@ -399,9 +402,6 @@ PickletExportView = function() {
   };
 
   return {
-    setController: function(c) {
-      controller = c;
-    },
     show: function() {
       reset();
     }
