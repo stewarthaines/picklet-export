@@ -13,7 +13,7 @@ PickletDocument = function(w, h, n) {
 PickletExportController = function() {
   return {
     createPicklet: function(p) {
-      // panel_count, name, guides) {
+      // expects these vars in 'p'
       var panel_count = p.count;
       var name = p.name;
       var guides = p.guides;

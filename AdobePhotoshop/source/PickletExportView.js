@@ -27,8 +27,10 @@ PickletExportView = function() {
   var action_txt;
   
   var create_btn;
-  var panel_count_txt;
   var picklet_title_txt;
+  var panel_count_label;
+  var panel_count_txt;
+  var title_prompt_label;
   var guides_label;
   var guides_checkbox;
   var prompt_save_label;
@@ -46,6 +48,9 @@ PickletExportView = function() {
   var group_optimize;
   var group_help;
   var group_log;
+  
+  // export group
+  var export_group_label;
   
   var english_item;
   var french_item;
@@ -133,23 +138,23 @@ PickletExportView = function() {
       group_create = group_action.add("group{\
       orientation:'column',\
       alignment:'top',\
+      visible:false,\
       panel:Panel{\
-        text:'New document',\
         alignChildren:'right',\
         title:Group{\
-          label_title:StaticText{text:'Picklet title:'},\
-          text_title:EditText{text:'',characters:15,active:true},\
+          label_title:StaticText{},\
+          text_title:EditText{characters:15,active:true},\
         },\
         panel_count:Group{\
-          label_panel_count:StaticText{text:'Number of panels:'},\
-          text_panel_count:EditText{text:'',characters:15,active:true},\
+          label_panel_count:StaticText{},\
+          text_panel_count:EditText{characters:15,active:true},\
         },\
         guides:Group{\
           label_guides:StaticText{},\
           thing:Group{\
             orientation:'stack',\
             alignment:'left',\
-            text_title:EditText{text:'',characters:15,active:true,visible:false},\
+            text_title:EditText{characters:15,active:true,visible:false},\
             checkbox_guides:Checkbox{alignment:'left'},\
           }\
         },\
@@ -158,7 +163,7 @@ PickletExportView = function() {
           thing:Group{\
             orientation:'stack',\
             alignment:'left',\
-            text_save:EditText{text:'',characters:15,active:true,visible:false},\
+            text_save:EditText{characters:15,active:true,visible:false},\
             checkbox_save:Checkbox{alignment:'left'},\
           }\
         },\
@@ -166,7 +171,12 @@ PickletExportView = function() {
       }}");
 
       create_txt = group_create.panel;
+
+      title_prompt_label = group_create.panel.title.label_title;
+
       panel_count_txt = group_create.panel.panel_count.text_panel_count;
+      panel_count_label = group_create.panel.panel_count.label_panel_count;
+
       picklet_title_txt = group_create.panel.title.text_title;
 
       guides_label = group_create.panel.guides.label_guides;
@@ -180,26 +190,26 @@ PickletExportView = function() {
       create_btn = group_create.panel.button_create;
       create_btn.view = this;
 
-      group_create.visible = false;
-
       group_export = group_action.add("group{\
       orientation:'column',\
       alignment:'top',\
+      visible:false,\
       panel:Panel{\
         size:[300,300],\
-        text:'Export',\
-        text1:EditText{text:'',characters:25,active:true},\
+        text1:EditText{characters:25,active:true},\
         icon1:IconButton{title:'Create', image:'Step1Icon'},\
         button0:RadioButton{text:'Create',icon:'Step1Icon'},\
         list0:ListBox{multiselect:true},\
         dropdown0:DropDownList{},\
         progress0:Progressbar{preferredSize:[250,30]}\
       }}");
-      group_create.visible = false;
+
+      export_group_label = group_export.panel;
 
       group_optimize = group_action.add("group{\
       orientation:'column',\
       alignment:'top',\
+      visible:false,\
       panel:Panel{\
         size:[300,300],\
         text:'Optimize',\
@@ -210,11 +220,11 @@ PickletExportView = function() {
         dropdown0:DropDownList{},\
         progress0:Progressbar{preferredSize:[250,30]}\
       }}");
-      group_optimize.visible = false;
 
       group_help = group_action.add("group{\
       orientation:'column',\
       alignment:'top',\
+      visible:false,\
       panel:Panel{\
         text:'Help',\
         size:[300,300],\
@@ -255,8 +265,6 @@ PickletExportView = function() {
           global_options.set('language', lang);
           reset();
         });
-
-      group_help.visible = false;
 
       group_log = group_action.add("group{\
       orientation:'column',\
@@ -404,11 +412,19 @@ PickletExportView = function() {
       /// button label to create a new picklet document
       create_btn.text = _("Create");
 
+      panel_count_label.text = _("Number of panels:");
+
+      title_prompt_label.text = _("Picklet title:");
+
       guides_label.text = _("Include guides:");
       prompt_save_label.text = _("Prompt to save:");
 
       panel_count_txt.text = '1';
       picklet_title_txt.text = _("Untitled Picklet");
+
+      // 'export' group controls
+      export_group_label.text = _("Export");
+      
 
   };
   
