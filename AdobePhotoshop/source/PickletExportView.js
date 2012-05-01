@@ -9,7 +9,7 @@ PickletExportView = function() {
     {'code': 'zh', 'name': 'Standard Chinese'}
   ];
 
-  var main_window;
+  this.main_window;
   var close_btn;
 
   // sidebar
@@ -25,15 +25,15 @@ PickletExportView = function() {
   var script_btn;
   var footer_txt;
   var action_txt;
-  var create_btn;
+  this.create_btn;
+  this.panel_count_txt;
+  this.picklet_title_txt;
+
   var export_btn;
   var optimize_btn;
   var create_txt;
   var language_txt;
   var language_btn;
-  
-  // create
-  var create_btn;
   
   var group_action_radio;
   var group_create;
@@ -51,18 +51,23 @@ PickletExportView = function() {
   this.model = null;
 
   var documentName = 'dummy_name';
-  if (app.activeDocument) documentName = app.activeDocument.fullName;
-  this.document_options = new CustomOptions('Picklet-Settings-' + app.activeDocument.fullName);
+  if (app.activeDocument) {
+    try {
+      documentName = app.activeDocument.fullName;
+    } catch(e) {
+      documentName = app.activeDocument;
+    }
+  }
+  this.document_options = new CustomOptions('Picklet-Settings-' + documentName);
   this.action_selection = this.document_options.get('action_display', 0);
 
   this.global_options = new CustomOptions('Picklet-Settings');
-  this.selected_language = this.global_options.get('language', 'en');
+
+  // $.locale is something like 'en_AU' we just want 'en'
+  var default_language = $.locale.replace(/^([a-z]{2})_([A-Z]{2}).*$/, '$1')
+  this.selected_language = this.global_options.get('language', default_language);
 
   return this;
-};
-
-PickletExportView.prototype.setModel = function(model) {
-  this.model = model;
 };
 
 PickletExportView.prototype.setController = function(controller) {
@@ -71,16 +76,18 @@ PickletExportView.prototype.setController = function(controller) {
 
 PickletExportView.prototype.finish = function() {
   // get CustomOptions to save their storable options.
+  this.global_options.set('include_guides', this.guides_checkbox.value);
+
   this.global_options.put();
   this.document_options.put();
 };
 
 PickletExportView.prototype.init = function() {
 
-    main_window = new Window("dialog{orientation:'column',alignChildren:'fill'}");
+    this.main_window = new Window("dialog{orientation:'column',alignChildren:'fill'}");
 
-    var content = main_window.add("group{alignChildren:'top'}");
-    var buttons = main_window.add("group{\
+    var content = this.main_window.add("group{alignChildren:'top'}");
+    var buttons = this.main_window.add("group{\
         orientation:'stack',\
         group_right:Group{\
           alignment:['right', 'bottom'],\
@@ -103,7 +110,7 @@ PickletExportView.prototype.init = function() {
 
     close_btn.addEventListener('click',
     function() {
-        main_window.close();
+        this.view.main_window.close();
     });
 
     var sidebar = content.add("group{\
@@ -135,22 +142,39 @@ PickletExportView.prototype.init = function() {
     orientation:'column',\
     alignment:'top',\
     panel:Panel{\
-      size:[300,120],\
+      size:[300,140],\
       text:'New document',\
       alignChildren:'right',\
+      title:Group{\
+        label_title:StaticText{text:'Picklet title:'},\
+        text_title:EditText{text:'',characters:15,active:true},\
+      },\
       panel_count:Group{\
         label_panel_count:StaticText{text:'Number of panels:'},\
         text_panel_count:EditText{text:'',characters:15,active:true},\
       },\
-      title:Group{\
-        label_title:StaticText{text:'Picklet title:'},\
-        text_title:EditText{text:'',characters:15,active:true},\
+      guides:Group{\
+        label_guides:StaticText{},\
+        thing:Group{\
+          orientation:'stack',\
+          alignment:'left',\
+          text_title:EditText{text:'',characters:15,active:true,visible:false},\
+          checkbox_guides:Checkbox{value:true,alignment:'left'},\
+        }\
       },\
       button_create:Button{alignment:'right'},\
     }}");
 
     create_txt = group_create.panel;
-    create_btn = group_create.panel.button_create;
+    this.panel_count_txt = group_create.panel.panel_count.text_panel_count;
+    this.picklet_title_txt = group_create.panel.title.text_title;
+
+    this.guides_label = group_create.panel.guides.label_guides;
+    this.guides_checkbox = group_create.panel.guides.thing.checkbox_guides;
+    this.guides_checkbox.value = this.global_options.get('include_guides', true);
+
+    this.create_btn = group_create.panel.button_create;
+    this.create_btn.view = this;
 
     group_create.visible = false;
 
@@ -246,12 +270,24 @@ PickletExportView.prototype.init = function() {
 };
 
 PickletExportView.prototype.reset = function() {
-  if (typeof main_window != "undefined") main_window.close();
+  if (typeof this.main_window != "undefined") this.main_window.close();
   this.init(); // need to recreate the controls so autolayout works
   // this.action_selection = this.document_options.get('action_display', 0);
+  this.updateHandlers();
   this.loadLanguage(this.selected_language);
   this.updateLabels();
-  main_window.show();
+  this.main_window.show();
+};
+
+PickletExportView.prototype.updateHandlers = function() {
+  this.create_btn.addEventListener('click', function() {
+    var layer_count = this.view.panel_count_txt.text;
+    var title = this.view.picklet_title_txt.text;
+    var include_guides = this.view.guides_checkbox.value;
+    this.view.main_window.close();
+    PickletExportController.createPicklet(layer_count, title, include_guides);
+  });
+  // main_window.cancelElement = close_btn;
 };
 
 PickletExportView.prototype.show = function() {
@@ -285,6 +321,7 @@ PickletExportView.prototype.updateActionDisplay = function() {
   group_log.visible = false;
   if (this.action_selection == 0) {
     group_create.visible = true;
+    this.main_window.defaultElement = this.create_btn;
   } else if (this.action_selection == 1) {
     group_export.visible = true;
   } else if (this.action_selection == 2) {
@@ -310,7 +347,7 @@ PickletExportView.prototype.updateLabels = function() {
     }
 
     /// the title of the dialog
-    main_window.text = _("Picklet Export");
+    this.main_window.text = _("Picklet Export");
 
     /// label for 'close' button on dialog
     close_btn.text = _("Close");
@@ -361,5 +398,11 @@ PickletExportView.prototype.updateLabels = function() {
     }
 
     /// button label to create a new picklet document
-    create_btn.text = _("Create");
+    this.create_btn.text = _("Create");
+    
+    this.guides_label.text = _("Include guides:");
+
+    this.panel_count_txt.text = '1';
+    this.picklet_title_txt.text = _("Untitled Picklet");
+    
 };

@@ -10,12 +10,8 @@ function define(name, f) {};
 var view = new PickletExportView();
 var controller = new PickletExportController();
 
-// controller.setModel(model);
 view.setController(controller);
-// view.setModel(model);
 
-// model.init();
 view.show();
 
 view.finish();
-// this.model.finish(); // to save dialog settings for next run
