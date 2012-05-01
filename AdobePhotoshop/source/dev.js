@@ -16,7 +16,7 @@
 
 // @include 'Gettext.js'
 
-// @include 'PickletExportModel.js'
+// @include 'CustomOptions.js'
 // @include 'PickletExportView.js'
 // @include 'PickletExportController.js'
 

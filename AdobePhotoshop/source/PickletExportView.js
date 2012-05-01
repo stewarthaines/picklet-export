@@ -46,11 +46,17 @@ PickletExportView = function() {
   var french_item;
   var standard_chinese_item;
   var language_list;
-  var selected_language = 'en';
   
-  this.action_selection = 0;
   this.controller = null;
   this.model = null;
+
+  var documentName = 'dummy_name';
+  if (app.activeDocument) documentName = app.activeDocument.fullName;
+  this.document_options = new CustomOptions('Picklet-Settings-' + app.activeDocument.fullName);
+  this.action_selection = this.document_options.get('action_display', 0);
+
+  this.global_options = new CustomOptions('Picklet-Settings');
+  this.selected_language = this.global_options.get('language', 'en');
 
   return this;
 };
@@ -61,6 +67,12 @@ PickletExportView.prototype.setModel = function(model) {
 
 PickletExportView.prototype.setController = function(controller) {
   this.controller = controller;
+};
+
+PickletExportView.prototype.finish = function() {
+  // get CustomOptions to save their storable options.
+  this.global_options.put();
+  this.document_options.put();
 };
 
 PickletExportView.prototype.init = function() {
@@ -123,6 +135,7 @@ PickletExportView.prototype.init = function() {
     orientation:'column',\
     alignment:'top',\
     panel:Panel{\
+      size:[300,120],\
       text:'New document',\
       alignChildren:'right',\
       panel_count:Group{\
@@ -133,7 +146,7 @@ PickletExportView.prototype.init = function() {
         label_title:StaticText{text:'Picklet title:'},\
         text_title:EditText{text:'',characters:15,active:true},\
       },\
-      button_create:Button{},\
+      button_create:Button{alignment:'right'},\
     }}");
 
     create_txt = group_create.panel;
@@ -145,13 +158,14 @@ PickletExportView.prototype.init = function() {
     orientation:'column',\
     alignment:'top',\
     panel:Panel{\
+      size:[300,300],\
       text:'Export',\
-      text1:EditText{text:'',characters:30,active:true},\
+      text1:EditText{text:'',characters:25,active:true},\
       icon1:IconButton{title:'Create', image:'Step1Icon'},\
       button0:RadioButton{text:'Create',icon:'Step1Icon'},\
       list0:ListBox{multiselect:true},\
       dropdown0:DropDownList{},\
-      progress0:Progressbar{preferredSize:[300,30]}\
+      progress0:Progressbar{preferredSize:[250,30]}\
     }}");
     group_create.visible = false;
 
@@ -159,13 +173,14 @@ PickletExportView.prototype.init = function() {
     orientation:'column',\
     alignment:'top',\
     panel:Panel{\
+      size:[300,300],\
       text:'Optimize',\
-      text1:EditText{text:'',characters:30,active:true},\
+      text1:EditText{text:'',characters:25,active:true},\
       icon1:IconButton{title:'Create', image:'Step1Icon'},\
       button0:RadioButton{text:'Create',icon:'Step1Icon'},\
       list0:ListBox{multiselect:true},\
       dropdown0:DropDownList{},\
-      progress0:Progressbar{preferredSize:[300,30]}\
+      progress0:Progressbar{preferredSize:[250,30]}\
     }}");
     group_optimize.visible = false;
 
@@ -174,6 +189,7 @@ PickletExportView.prototype.init = function() {
     alignment:'top',\
     panel:Panel{\
       text:'Help',\
+      size:[300,300],\
       group0:Group{\
         orientation:'row',\
         text_language:StaticText{},\
@@ -199,7 +215,7 @@ PickletExportView.prototype.init = function() {
     for (i = 0; i < this.LC_LANGUAGES.length; i++) {
       var item = language_list.add('item', '');
       item.code = this.LC_LANGUAGES[i].code;
-      if (this.selected_language === item.code) {
+      if (this.selected_language == item.code) {
         language_list.selection = item;
       }
     }
@@ -208,6 +224,7 @@ PickletExportView.prototype.init = function() {
       function(evt) {
         var lang = language_list.selection.code;
         this.view.selected_language = lang;
+        this.view.global_options.set('language', lang);
         this.view.reset();
       });
   
@@ -222,7 +239,7 @@ PickletExportView.prototype.init = function() {
 
     if (this.model) {
       // this.actions_list.selection.index = this.model.getActionDisplay();
-      this.action_selection = this.model.getActionDisplay();
+      this.action_selection = this.document_options.get('action_display', 0);
     }
 
     this.updateActionDisplay();
@@ -230,16 +247,14 @@ PickletExportView.prototype.init = function() {
 
 PickletExportView.prototype.reset = function() {
   if (typeof main_window != "undefined") main_window.close();
-  this.init();
-  this.action_selection = this.model.getActionDisplay();
+  this.init(); // need to recreate the controls so autolayout works
+  // this.action_selection = this.document_options.get('action_display', 0);
   this.loadLanguage(this.selected_language);
   this.updateLabels();
   main_window.show();
 };
 
-PickletExportView.prototype.show = function(lang) {
-  if (typeof lang == 'undefined') { lang = 'en'; }
-  this.selected_language = lang;
+PickletExportView.prototype.show = function() {
   this.reset();
 };
 
@@ -257,7 +272,8 @@ PickletExportView.prototype.loadLanguage = function(language) {
     var messages_string = messages_file.read();
     eval("json_locale_data = " + messages_string);
   }
-  this.model.setLanguage(language);
+  // this.model.setLanguage(language);
+  this.global_options.set('language', language);
 }
 
 
@@ -278,7 +294,8 @@ PickletExportView.prototype.updateActionDisplay = function() {
   } else {
     group_log.visible = true;
   }
-  this.model.setActionDisplay(this.action_selection);
+  // this.model.setActionDisplay(this.action_selection);
+  this.document_options.set('action_display', this.action_selection);
   this.actions_list.selection = this.action_selection;
 };
 
@@ -307,8 +324,8 @@ PickletExportView.prototype.updateLabels = function() {
     item.icon = 'Step3Icon';
     this.actions_list.add('item', _("Help"));
     this.actions_list.add('item', _("Review"));
-    // this.actions_list.selection = 0;
-    this.actions_list.selection = this.model.getActionDisplay();
+    // this.actions_list.selection = this.model.getActionDisplay();
+    this.actions_list.selection = this.document_options.get('action_display', 0);
 
     /// script name and version identifier
     script_name_txt.text = _("PickletExport.jsx r13");

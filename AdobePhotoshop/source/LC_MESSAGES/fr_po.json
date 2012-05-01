@@ -1,0 +1,26 @@
+{
+  "messages" : {
+    "English": [null, ""],
+    "French": [null, "Français"],
+    "Standard Chinese": [null, "中文"],
+    "Check for update": [null, "Recherchez des mises à jour."],
+    "": {
+        "MIME-Version": " 1.0",
+        "POT-Creation-Date": " 2012-04-27 23:35+1000",
+        "Language": " ",
+        "Last-Translator": " FULL NAME <EMAIL@ADDRESS>",
+        "Content-Type": " text/plain; charset=CHARSET",
+        "PO-Revision-Date": " YEAR-MO-DA HO:MI+ZONE",
+        "Language-Team": " LANGUAGE <LL@li.org>",
+        "Content-Transfer-Encoding": " 8bit",
+        "Project-Id-Version": " PACKAGE VERSION",
+        "Report-Msgid-Bugs-To": " "
+    },
+    "Check": [null, "Coche"],
+    "PickletExport.jsx r13": [null, "PickletExport.jsx r13"],
+    "Close": [null, "Fermer"],
+    "Picklet Export": [null, "Picklet exportation"],
+    "Read documentation online": [null, "Lire la documentation en ligne"],
+    "(c) 2012 RobotInaBox Pty Ltd": [null, "© 2012 RobotInaBox Pty Ltd"]
+}
+}

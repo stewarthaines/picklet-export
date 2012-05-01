@@ -1,80 +1,36 @@
-PickletExportModel = function() {
-  this.EXPORT_SETTINGS_GLOBAL_NAME = "Picklet-Export-Settings-Global";
-  this.EXPORT_SETTINGS_PREFIX = "Picklet-Export-Settings-";
+CustomOptions = function(id) {
+  this.options_id = id;
 
-  this.global_info = new Object();
-  this.document_info = new Object();
+  this.custom_options = new Object();
   
-  // a default. pre all other defaults. why? who knows.
-  this.global_info.current_language = 'en';
+  this.init();
 };
 
-PickletExportModel.prototype.getActionDisplay = function() {
-  return this.document_info.action_display;
+CustomOptions.prototype.get = function(key, default_value) {
+  if (typeof (this.custom_options[key]) == 'undefined') {
+    this.custom_options[key] = default_value;
+  }
+  return this.custom_options[key];
 };
 
-PickletExportModel.prototype.setActionDisplay = function(val) {
-  this.document_info.action_display = val;
+CustomOptions.prototype.set = function(key, val) {
+  this.custom_options[key] = val;
 };
 
-PickletExportModel.prototype.finish = function() {
-  // alert('finish with: ' + this.document_info.action_display);
-  var d1 = objectToDescriptor(this.global_info);
-  // d.putString( app.charIDToTypeID( 'Msge' ), strMessage );
-  app.putCustomOptions(this.EXPORT_SETTINGS_GLOBAL_NAME, d1);
-
-  var d2 = objectToDescriptor(this.document_info);
-  // d.putString( app.charIDToTypeID( 'Msge' ), strMessage );
-  app.putCustomOptions(this.EXPORT_SETTINGS_PREFIX + app.activeDocument.fullName, d2);
+CustomOptions.prototype.put = function() {
+  var d1 = this.objectToDescriptor(this.custom_options);
+  app.putCustomOptions(this.options_id, d1);
 };
 
-PickletExportModel.prototype.setLanguage = function(language) {
-  this.global_info.current_language = language;
-};
-
-PickletExportModel.prototype.init = function() {
-  // provide defaults for all data
-
+CustomOptions.prototype.init = function() {
   // try to get persisted values for model
   try {
-    var d = app.getCustomOptions(this.EXPORT_SETTINGS_GLOBAL_NAME);
-    descriptorToObject(this.export_info, d);
+    var d = app.getCustomOptions(this.options_id);
+    this.descriptorToObject(this.custom_options, d);
   }
   catch(e) {
     // alert('didn\'t load global defaults');
-    // it's ok if we don't have any options, continue with defaults
   }
-  
-  // document-level settings
-  this.document_info.action_display = 0;
-  this.document_info.selectionOnly = false;
-  this.document_info.exportThumbnails = true;
-  this.document_info.fileType = 0; //pngIndex;
-  this.document_info.saveRetinaResolution = true;
-  this.document_info.exportCovers = true;
-  this.document_info.savePickletTemplate = true;
-  this.document_info.exportSelectedFullsize = true;
-  this.document_info.exportOrangeAs8Bit = true;
-  try {
-      this.document_info.destination = Folder(app.activeDocument.fullName.parent).fsName;
-      // destination folder
-      var tmp = app.activeDocument.fullName.name;
-      this.document_info.fileNamePrefix = decodeURI(tmp.substring(0, tmp.indexOf(".")));
-  } catch(someError) {
-      this.document_info.destination = new String("");
-      this.document_info.fileNamePrefix = app.activeDocument.name;
-  }
-
-  // try to get persisted values for model
-  try {
-    var d = app.getCustomOptions(this.EXPORT_SETTINGS_PREFIX + app.activeDocument.fullName);
-    descriptorToObject(this.document_info, d);
-  }
-  catch(e) {
-    // alert('didn\'t load document defaults');
-    // it's ok if we don't have any options, continue with defaults
-  }
-  
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -87,7 +43,7 @@ PickletExportModel.prototype.init = function() {
 // NOTE: Only boolean, string, and number are supported, use a post processor
 //       to convert (f) other types to one of these forms.
 ///////////////////////////////////////////////////////////////////////////////
-function descriptorToObject(o, d) {
+CustomOptions.prototype.descriptorToObject = function (o, d) {
     if (! d) return;
     var l = d.count;
     for (var i = 0; i < l; i++) {
@@ -129,7 +85,7 @@ function descriptorToObject(o, d) {
 // NOTE: Only boolean, string, and number are supported, use a pre processor
 //       to convert (f) other types to one of these forms.
 ///////////////////////////////////////////////////////////////////////////////
-function objectToDescriptor(o) {
+CustomOptions.prototype.objectToDescriptor = function(o) {
     var d = new ActionDescriptor;
     var l = o.reflect.properties.length;
     for (var i = 0; i < l; i++) {

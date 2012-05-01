@@ -13,7 +13,7 @@
     include: [
       "json2",
       "Gettext",
-      "PickletExportModel",
+      "CustomOptions",
       "PickletExportView",
       "PickletExportController",
       "main"],

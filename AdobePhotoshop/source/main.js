@@ -7,15 +7,15 @@
 */
 function define(name, f) {};
 
-var model = new PickletExportModel();
 var view = new PickletExportView();
 var controller = new PickletExportController();
 
-controller.setModel(model);
+// controller.setModel(model);
 view.setController(controller);
-view.setModel(model);
+// view.setModel(model);
 
-model.init();
+// model.init();
 view.show();
 
-this.model.finish(); // to save dialog settings for next run
+view.finish();
+// this.model.finish(); // to save dialog settings for next run
