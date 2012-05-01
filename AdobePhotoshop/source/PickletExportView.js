@@ -291,6 +291,7 @@ PickletExportView = function() {
         'guides': guides_checkbox.value,
         'save': prompt_save_checkbox.value
       };
+      put_options();
       main_window.close();
       controller.createPicklet(properties);
     });
