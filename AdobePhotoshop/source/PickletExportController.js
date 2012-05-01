@@ -1,93 +1,101 @@
-PickletDocument = function(width, height, name) {
-  this.width = width;
-  this.height = height;
-  this.name = name;
+PickletDocument = function(w, h, n) {
+  var width = w;
+  var height = h;
+  var name = n;
 
-  return this;
+  return {
+    width: width,
+    height: height,
+    name: name
+  };
 };
 
 PickletExportController = function() {
-  this.model = null;
-};
+  return {
+    createPicklet: function(p) {
+      // panel_count, name, guides) {
+      var panel_count = p.count;
+      var name = p.name;
+      var guides = p.guides;
+      var save = p.save;
+      
+      var pd = new PickletDocument(640, 960, name);
 
-PickletExportController.prototype.setModel = function(model) {
-  this.model = model;
-};
+      var docRef = app.documents.add(pd.width, pd.height, 72, name);
+      app.activeDocument = docRef;
 
-PickletExportController.createPicklet = function(panel_count, name, guides) {
-  var pd = new PickletDocument(640, 960, name);
+      if (guides) {
+    /*
+        // CS5 and later only
+        var guides = docRef.guides;
+        guides.add(Direction.HORIZONTAL, 40);
+        guides.add(Direction.HORIZONTAL, 128);
+        guides.add(Direction.HORIZONTAL, 772);
+    */
+        var layerRef = docRef.artLayers.add();
+        layerRef.name = 'region_guide';
+        layerRef.blendMode = BlendMode.NORMAL;
 
-  var docRef = app.documents.add(pd.width, pd.height, 72, name);
-  app.activeDocument = docRef;
+        //      docRef.layers['status_bar'].select();
 
-  if (guides) {
-/*
-    // CS5 and later only
-    var guides = docRef.guides;
-    guides.add(Direction.HORIZONTAL, 40);
-    guides.add(Direction.HORIZONTAL, 128);
-    guides.add(Direction.HORIZONTAL, 772);
-*/
-    var layerRef = docRef.artLayers.add();
-    layerRef.name = 'region_guide';
-    layerRef.blendMode = BlendMode.NORMAL;
+        // create a black status bar
+        var shapeRef = [[0,0], [pd.width,0], [pd.width,40], [0,40]];
+        docRef.selection.select(shapeRef);
+        var blackColor = new SolidColor();
+        blackColor.rgb.red = 0;
+        blackColor.rgb.green = 0;
+        blackColor.rgb.blue = 0;
+        docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 100, false);
 
-    //      docRef.layers['status_bar'].select();
+        // create a block representing the nav controls
+        docRef.selection.select([[0,40], [pd.width,40], [pd.width,128], [0,128]]);
+        docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 25, false);
 
-    // create a black status bar
-    var shapeRef = [[0,0], [pd.width,0], [pd.width,40], [0,40]];
-    docRef.selection.select(shapeRef);
-    var blackColor = new SolidColor();
-    blackColor.rgb.red = 0;
-    blackColor.rgb.green = 0;
-    blackColor.rgb.blue = 0;
-    docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 100, false);
+        // create a block representing the slider on home screen dimensions
+        docRef.selection.select([[0,772], [pd.width,772], [pd.width,pd.height], [0,pd.height]]);
+        docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 25, false);
 
-    // create a block representing the nav controls
-    docRef.selection.select([[0,40], [pd.width,40], [pd.width,128], [0,128]]);
-    docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 25, false);
+        docRef.selection.select([]);
+      }
 
-    // create a block representing the slider on home screen dimensions
-    docRef.selection.select([[0,772], [pd.width,772], [pd.width,pd.height], [0,pd.height]]);
-    docRef.selection.fill(blackColor, ColorBlendMode.NORMAL, 25, false);
+      var workingSetRef = docRef.layerSets.add();
+      workingSetRef.name = 'working';
 
-    docRef.selection.select([]);
-  }
+      if (guides) {
+        // Move the new layer to the end of the working layer
+        layerRef.move(workingSetRef, ElementPlacement.PLACEATEND);
+      }
 
-  var workingSetRef = docRef.layerSets.add();
-  workingSetRef.name = 'working';
+    /*
+      // set some document info properties
+      docInfoRef = docRef.info;
+      docInfoRef.copyrighted = CopyrightedType.COPYRIGHTEDWORK;
+      //docInfoRef.ownerUrl = "http://picklet.net";
+    */
+      var previousSetRef;
+      for (var count = 1; count <= panel_count; count++) {
+        var name = 'panel_' + count;
+        var panelComp = docRef.layerComps.add(name, null, false, false, true);
+        // panelComp.name = name;
+        var panelSetRef = docRef.layerSets.add();
+        panelSetRef.name = name;
+        if (previousSetRef) {
+          panelSetRef.move(previousSetRef, ElementPlacement.PLACEAFTER);
+        }
+        previousSetRef = panelSetRef;
+      }
 
-  if (guides) {
-    // Move the new layer to the end of the working layer
-    layerRef.move(workingSetRef, ElementPlacement.PLACEATEND);
-  }
+      // and a layer comp for the cover image
+      docRef.layerComps.add('cover', null, false, false, true);
 
-/*
-  // set some document info properties
-  docInfoRef = docRef.info;
-  docInfoRef.copyrighted = CopyrightedType.COPYRIGHTEDWORK;
-  //docInfoRef.ownerUrl = "http://picklet.net";
-*/
-  var previousSetRef;
-  for (var count = 1; count <= panel_count; count++) {
-    var name = 'panel_' + count;
-    var panelComp = docRef.layerComps.add(name, null, false, false, true);
-    // panelComp.name = name;
-    var panelSetRef = docRef.layerSets.add();
-    panelSetRef.name = name;
-    if (previousSetRef) {
-      panelSetRef.move(previousSetRef, ElementPlacement.PLACEAFTER);
+      // open a Save As dialog
+      if (save) {
+        try {
+          executeAction( charIDToTypeID( "save" ), undefined, DialogModes.ALL );
+        } catch(e) {
+          // just notification that user cancelled 'save'
+        }
+      }
     }
-    previousSetRef = panelSetRef;
-  }
-
-  // and a layer comp for the cover image
-  docRef.layerComps.add('cover', null, false, false, true);
-
-  // open a Save As dialog
-  try {
-    executeAction( charIDToTypeID( "save" ), undefined, DialogModes.ALL );
-  } catch(e) {
-    // just notification that user cancelled 'save'
-  }
+  };
 };

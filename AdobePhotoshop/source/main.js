@@ -13,5 +13,3 @@ var controller = new PickletExportController();
 view.setController(controller);
 
 view.show();
-
-view.finish();
