@@ -60,16 +60,23 @@ PickletExportView = function() {
   function _(msgid) {
       return gt.gettext(msgid);
   }
-  
-  var findElement = function (el, name) {
-    // recursive function to locate a named element child of element
-    if (el.name == name) return el;
-    if (typeof el.children == 'undefined') return null;
-    for (var i = 0; i < el.children.length; i++) {
-      elem = findElement(el.children[i], name);
-      if (elem) return elem;
-    }
-    return null;
+
+  var ElementMap = function(el) {
+    var obj = {};
+    // var out = 'Check this\n';
+    // walk the el.children tree, gathering named elements
+    // essentially pulling a flat map of names to elements from
+    // the messy hierarchy of resource elements
+    var addNamedChildrenToObj = function (el, obj) {
+      if (el.name) {obj[el.name] = el; /*out+=el.name+'\n';*/}
+      if (!el.children) return;
+      for (var i = 0; i < el.children.length; i++) {
+        addNamedChildrenToObj(el.children[i], obj);
+      }
+    };
+    addNamedChildrenToObj(el, obj);
+    // alert(out);
+    return obj;
   };
 
   var createPicklet = function() {
@@ -127,12 +134,14 @@ PickletExportView = function() {
       /// the title of the dialog
       main_window.text = _("Picklet Export");
 
+      var e; // this is the ElementMap local instance. gets re-used.
+
       var content = main_window.add("group{alignChildren:'top'}");
       var buttons = main_window.add("group{\
           orientation:'stack',\
           group_right:Group{\
             alignment:['right', 'bottom'],\
-            button_close:Button{}\
+            button:Button{name:'close_btn'}\
           },\
           footer:Group{\
             alignment:'left',\
@@ -142,42 +151,57 @@ PickletExportView = function() {
           },\
       }");
 
-      close_btn = buttons.group_right.button_close;
-      /// label for 'close' button on dialog
-      close_btn.text = _("Close");
+      e = ElementMap(buttons);
+
+      close_btn = e.close_btn;
       close_btn.addEventListener('click', closeWindow);
       main_window.cancelElement = close_btn;
+
+      /// label for 'close' button on dialog
+      close_btn.text = _("Close");
 
       /// script name and version identifier
       buttons.footer.name.text = _("PickletExport.jsx r13");
 
       var font = ScriptUI.newFont (buttons.footer.text_by.graphics.font.name, 10);
       buttons.footer.text_by.graphics.font = font;
+
       /// footer text. copyright notice.
       buttons.footer.text_by.text = _("(c) 2012 RobotInaBox Pty Ltd");
 
       var sidebar = content.add("group{\
         orientation:'column',\
-        list_actions:ListBox{preferredSize:[150, 250], properties:{scrolling:false}},\
+        list_actions:ListBox{name:'actions_list',minimumSize:[150, 250]},\
       }");
 
-      actions_list = sidebar.list_actions;
+      e = ElementMap(sidebar);
+
+      actions_list = e.actions_list;
       var font = ScriptUI.newFont (actions_list.graphics.font.name, 14);
       actions_list.graphics.font = font;
 
+      /// label for create action
       var item = actions_list.add('item', _("Create"));
       item.icon = 'Step1Icon';
+
+      /// label for export action
       item = actions_list.add('item', _("Export"));
       item.icon = 'Step2Icon';
+
+      /// label for optimize action
       item = actions_list.add('item', _("Optimize"));
       item.icon = 'Step3Icon';
-      actions_list.add('item', _("Help"));
-      actions_list.add('item', _("Review"));
-      actions_list.selection = document_options.get('action_display', 0);
 
+      /// label for help action
+      actions_list.add('item', _("Help"));
+
+      /// label for review action
+      actions_list.add('item', _("Review"));
+
+      actions_list.selection = document_options.get('action_display', 0);
       actions_list.addEventListener('change', updateActionDisplay);
 
-      // group_action holds the 3 states corresponding to the radio button selection
+      // group_action holds the groups corresponding to the radio button selection
       var group_action = content.add("group{\
         orientation:'stack'\
       }");
@@ -191,11 +215,11 @@ PickletExportView = function() {
         margins:[5, 16, 5, 10],\
         alignChildren:'right',\
         title:Group{\
-          label_title:StaticText{},\
-          text_title:EditText{characters:15,active:true},\
+          label_title:StaticText{name:'title_label'},\
+          title:EditText{name:'title_txt',characters:15,active:true},\
         },\
         panel_count:Group{\
-          label_panel_count:StaticText{},\
+          label_panel_count:StaticText{name:'panel_count_label'},\
           thing:Group{\
             orientation:'stack',\
             alignment:'left',\
@@ -204,64 +228,69 @@ PickletExportView = function() {
           },\
         },\
         guides:Group{\
-          label_guides:StaticText{},\
+          label_guides:StaticText{name:'guides_label'},\
           thing:Group{\
             orientation:'stack',\
             alignment:'left',\
             text_title:EditText{characters:15,visible:false},\
-            checkbox_guides:Checkbox{alignment:'left'},\
+            checkbox:Checkbox{name:'guides_checkbox',alignment:'left'},\
           }\
         },\
         save:Group{\
-          label_save:StaticText{},\
+          label:StaticText{name:'save_label'},\
           thing:Group{\
             orientation:'stack',\
             alignment:'left',\
             text_save:EditText{characters:15,visible:false},\
-            checkbox_save:Checkbox{alignment:'left'},\
+            checkbox:Checkbox{name:'save_checkbox',alignment:'left'},\
           }\
         },\
-        button_create:Button{alignment:'right'},\
+        button:Button{name:'create_btn',alignment:'right'},\
       }}");
 
-      /// label for the group of options for the 'Create' action
+      e = ElementMap(group_create);
+
+      /// label for the group relating to the 'Create' action
       group_create.panel.text = _("New document");
 
-      /// label for option
-      group_create.panel.title.label_title.text = _("Picklet title:");
+      /// label for input to give new document a title
+      e.title_label.text = _("Picklet title:");
 
-      panel_count_txt = findElement(group_create, 'text_panel_count'); //.panel.panel_count.text_panel_count;
-      panel_count_txt.text = '1';
+      picklet_title_txt = e.title_txt;
 
-      /// label for option
-      group_create.panel.panel_count.label_panel_count.text = _("Number of panels:");
-
-      picklet_title_txt = group_create.panel.title.text_title;
       /// default title for picklet
       picklet_title_txt.text = _("Untitled Picklet");
 
-      /// label for option
-      group_create.panel.guides.label_guides.text = _("Include guides:");
+      panel_count_txt = e.text_panel_count;
+      panel_count_txt.text = '1';
 
-      guides_checkbox = group_create.panel.guides.thing.checkbox_guides;
+      /// label for input to specify number of panels to create in new document
+      e.panel_count_label.text = _("Number of panels:");
+
+      /// label for option to draw guides in the newly created document
+      e.guides_label.text = _("Include guides:");
+
+      guides_checkbox = e.guides_checkbox;
       guides_checkbox.value = global_options.get('include_guides', true);
 
-      /// label for option
-      group_create.panel.save.label_save.text = _("Prompt to save:");
+      /// label for option to prompt the user to save the newly created document
+      e.save_label.text = _("Prompt to save:");
 
-      prompt_save_checkbox = group_create.panel.save.thing.checkbox_save;
+      prompt_save_checkbox = e.save_checkbox;
       prompt_save_checkbox.value = global_options.get('prompt_save', true);
 
-      create_btn = group_create.panel.button_create;
-      /// button label to create a new picklet document
-      create_btn.text = _("Create");
+      create_btn = e.create_btn;
       create_btn.addEventListener('click', createPicklet);
+
+      /// label for button to create a new picklet document
+      create_btn.text = _("Create");
 
       group_export = group_action.add("group{\
       orientation:'column',\
       alignment:'top',\
       visible:false,\
       panel:Panel{\
+        name:'panel',\
         minimumSize:[300,300],\
         margins:[5, 16, 5, 10],\
         group0:Group{\
@@ -272,38 +301,38 @@ PickletExportView = function() {
             group0:Group{\
               orientation:'row',\
               alignment:'left',\
-              cover_check:Checkbox{},\
-              cover_label:StaticText{},\
+              cover_check:Checkbox{name:'cover_check'},\
+              cover_label:StaticText{name:'cover_label'},\
             }\
             group1:Group{\
               orientation:'row',\
               alignment:'right',\
-              list:DropDownList{},\
+              list:DropDownList{name:'image_types_list'},\
               input:EditText{name:'cover_image_jpeg_quality',characters:4},\
             }\
             group2:Group{\
               orientation:'row',\
               alignment:'left',\
-              template_check:Checkbox{},\
-              template_label:StaticText{},\
+              template_check:Checkbox{name:'template_check'},\
+              template_label:StaticText{name:'template_label'},\
             }\
             group3:Group{\
               orientation:'row',\
               alignment:'right',\
-              input:EditText{characters:12},\
+              input:EditText{name:'template_name_txt',characters:12},\
             }\
             group4:Group{\
               orientation:'row',\
               alignment:'left',\
-              layers_check:Checkbox{},\
-              layers_label:StaticText{},\
+              layers_check:Checkbox{name:'layers_check'},\
+              layers_label:StaticText{name:'layers_label'},\
             },\
             group5:Group{\
               orientation:'row',\
               alignment:'left',\
               margins:[30,0,0,0],\
-              fullsize_check:Checkbox{},\
-              fullsize_label:StaticText{},\
+              fullsize_check:Checkbox{name:'fullsize_check'},\
+              fullsize_label:StaticText{name:'fullsize_label'},\
             },\
           }\
           group1:Group{\
@@ -313,90 +342,100 @@ PickletExportView = function() {
               orientation:'column',\
               margins:[5, 0, 5, 0],\
               alignment:'fill',\
-              list0:DropDownList{alignment:'fill'},\
+              list0:DropDownList{name:'panels_list',alignment:'fill'},\
             },\
             thumb:Group{\
               orientation:'row',\
               alignment:'left',\
-              thumbnails_check:Checkbox{},\
-              thumbnails_label:StaticText{},\
+              thumbnails_check:Checkbox{name:'thumbnails_check'},\
+              thumbnails_label:StaticText{name:'thumbnails_label'},\
             }\
             list1:ListBox{preferredSize:[150, 103], properties:{scrolling:true}},\
           }\
         }\
-        destination_label:StaticText{alignment:'left'},\
+        destination_label:StaticText{name:'destination_label',alignment:'left'},\
         group1:Group{\
           alignment:'fill',\
           group0:Group{\
             destination_input:EditText{characters:20}\
-            button:Button{alignment:'right'},\
+            button:Button{name:'browse_btn',alignment:'right'},\
           }\
         }\
         group2:Group{\
           alignment:'fill',\
           slug:Group{\
-            checkbox:Checkbox{},\
-            label:StaticText{},\
-            input:EditText{characters:12},\
+            checkbox:Checkbox{name:'slug_check'},\
+            label:StaticText{name:'slug_label'},\
+            input:EditText{name:'slug_input',characters:12},\
           }\
         }\
-        button:Button{alignment:'right'},\
+        button:Button{name:'export_btn',alignment:'right'},\
       }\
       }");
 
-      group_export.panel.group0.group0.group0.cover_label.text = _("Cover image");
+      e = ElementMap(group_export);
 
-      cover_image_checkbox = group_export.panel.group0.group0.group0.cover_check;
+      /// label for option to include cover image in export
+      e.cover_label.text = _("Cover image");
+
+      cover_image_checkbox = e.cover_check;
       cover_image_checkbox.value = document_options.get('cover_image', true);
 
-      image_types_list = group_export.panel.group0.group0.group1.list;
+      image_types_list = e.image_types_list;
       item = image_types_list.add('item', 'JPEG');
       image_types_list.selection = item;
 
-      // main_window.findElement('cover_image_jpeg_quality').text = '7';
-      group_export.panel.group0.group0.group1.input.text = '8';
+      e.cover_image_jpeg_quality.text = '8';
 
-      group_export.panel.group0.group0.group2.template_label.text = _("Template file");
+      /// label for option to include the template file in export
+      e.template_label.text = _("Template file");
 
-      template_checkbox = group_export.panel.group0.group0.group2.template_check;
+      template_checkbox = e.template_check;
       template_checkbox.value = document_options.get('template', true);
 
-      template_name_txt = group_export.panel.group0.group0.group3.input;
+      template_name_txt = e.template_name_txt;
       template_name_txt.text = "picklet.json";
 
-      group_export.panel.group0.group0.group4.layers_label.text = _("Layers");
+      /// label for option to include layer images in export
+      e.layers_label.text = _("Layers");
 
-      layers_checkbox = group_export.panel.group0.group0.group4.layers_check;
+      layers_checkbox = e.layers_check;
       layers_checkbox.value = document_options.get('layers', true);
 
-      group_export.panel.group0.group0.group5.fullsize_label.text = _("Fullsize");
+      /// label for option to include fullsize layer images in export
+      e.fullsize_label.text = _("Fullsize");
 
-      layers_checkbox = group_export.panel.group0.group0.group5.fullsize_check;
-      layers_checkbox.value = document_options.get('fullsize', true);
+      fullsize_checkbox = e.fullsize_check;
+      fullsize_checkbox.value = document_options.get('fullsize', true);
 
-      panels_list = group_export.panel.group0.group1.group.list0;
+      panels_list = e.panels_list;
       item = panels_list.add('item', 'Panels');
       panels_list.selection = item;
       
-      thumbnails_checkbox = group_export.panel.group0.group1.thumb.thumbnails_check;
+      thumbnails_checkbox = e.thumbnails_check;
       thumbnails_checkbox.value = document_options.get('thumbnails', true);
 
-      group_export.panel.group0.group1.thumb.thumbnails_label.text = _("Thumbnails");
+      /// label for option to include panel thumbnail images in export
+      e.thumbnails_label.text = _("Thumbnails");
 
-      // label for 'export' group controls
-      group_export.panel.text = _("Export '%s'").replace('%s', document_name);
+      /// label for group controls related to exporting picklet files
+      e.panel.text = _("Export '%s'").replace('%s', document_name);
 
-      /// label for destination
-      group_export.panel.destination_label.text = _("Export to destination:");
+      /// label for input to save files to destination directory
+      e.destination_label.text = _("Export to destination:");
 
-      group_export.panel.group1.group0.button.text = _("Browse...");
+      /// label for button to browse for destination directory 
+      e.browse_btn.text = _("Browse...");
 
-      group_export.panel.group2.slug.checkbox.value = document_options.get('as_slug', true)
-      group_export.panel.group2.slug.label.text = _("in folder:");
-      group_export.panel.group2.slug.input.text = "untitled_picklet";
+      e.slug_check.value = document_options.get('as_slug', true)
 
-      export_btn = group_export.panel.button;
-      /// button text
+      /// label for option to use named sub-directory below the destination directory
+      e.slug_label.text = _("in folder:");
+
+      e.slug_input.text = "untitled_picklet";
+
+      export_btn = e.export_btn;
+      /// label for button to start the export of picklet files
       export_btn.text = _("Export");
 
       group_optimize = group_action.add("group{\
@@ -419,22 +458,27 @@ PickletExportView = function() {
         }\
       }}");
 
+      e = ElementMap(group_optimize);
+
       /// label for 'optimize' group controls
       group_optimize.panel.text = _("Optimize");
       
-      layer_export_types_list = findElement(group_optimize, 'layer_export_types');
+      layer_export_types_list = e.layer_export_types;
       item = layer_export_types_list.add('item', 'JPEG');
       layer_export_types_list.selection = item;
 
-      layer_export_quality = findElement(group_optimize, 'layer_export_quality');
+      layer_export_quality = e.layer_export_quality;
       layer_export_quality.text = '8';
 
-      findElement(group_optimize, 'layer_export_label').text = _("Fullsize");
+      /// label for option to export fullsize images
+      e.layer_export_label.text = _("Fullsize");
 
-      layer_export_fullsize = findElement(group_optimize, 'layer_export_fullsize');
+      layer_export_fullsize = e.layer_export_fullsize;
       layer_export_fullsize.value = document_options.get('layer_export_fullsize', true);
 
-      layer_export_btn = findElement(group_optimize, 'layer_export_action');
+      layer_export_btn = e.layer_export_action;
+
+      /// label for button to start export of layer image
       layer_export_btn.text = _("Export");
 
       group_help = group_action.add("group{\
@@ -447,42 +491,44 @@ PickletExportView = function() {
         margins:[5, 16, 5, 10],\
         group0:Group{\
           orientation:'row',\
-          text_language:StaticText{},\
-          list_language:DropDownList{},\
+          text_language:StaticText{name:'language_label'},\
+          list_language:DropDownList{name:'language_list'},\
         },\
-        text_update:StaticText{},\
-        button_update:Button{},\
-        text_documentation:StaticText{},\
-        button_documentation:Button{},\
-        text_script:StaticText{},\
-        button_script:Button{},\
+        text_update:StaticText{name:'update_label'},\
+        button_update:Button{name:'update_btn'},\
+        text_documentation:StaticText{name:'documentation_label'},\
+        button_documentation:Button{name:'documentation_btn'},\
+        text_script:StaticText{name:'script_label'},\
+        button_script:Button{name:'script_btn'},\
       }}");
 
-      /// text for button that queries the server for current version of script
-      group_help.panel.text_update.text = _("Check for update");
+      e = ElementMap(group_help);
 
-      update_btn = group_help.panel.button_update;
+      /// text for button that queries the server for current version of script
+      e.update_label.text = _("Check for update");
+
+      update_btn = e.update_btn;
       /// label on button that checks for udpates
       update_btn.text = _("Check");
 
       /// text prompting user to click the button to read online documentation
-      group_help.panel.text_documentation.text = _("Read documentation online");
+      e.documentation_label.text = _("Read documentation online");
 
-      documentation_btn = group_help.panel.button_documentation;
+      documentation_btn = e.documentation_btn;
       /// button label that opens a browser on the documentation
       documentation_btn.text = _("Open");
 
       /// text prompt to reveal the script in the Finder
-      group_help.panel.text_script.text = _("Reveal script in Finder");
+      e.script_label.text = _("Reveal script in Finder");
 
-      script_btn = group_help.panel.button_script;
+      script_btn = e.script_btn;
       /// button label that opens the Finder to reveal the script
       script_btn.text = _("Show");
 
       /// label for dropdown list to choose a language for the displayed dialog
-      group_help.panel.group0.text_language.text = _("Language");
+      e.language_label.text = _("Language");
 
-      language_list = group_help.panel.group0.list_language;
+      language_list = e.language_list;
       for (i = 0; i < LC_LANGUAGES.length; i++) {
         var item = language_list.add('item', '');
         item.code = LC_LANGUAGES[i].code;
