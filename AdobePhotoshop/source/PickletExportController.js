@@ -12,6 +12,9 @@ PickletDocument = function(w, h, n) {
 
 PickletExportController = function() {
   return {
+    exportPicklet: function() {
+      
+    },
     createPicklet: function(p) {
       // expects these vars in 'p'
       var panel_count = p.count;
