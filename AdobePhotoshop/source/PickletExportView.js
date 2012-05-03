@@ -23,7 +23,7 @@ PickletExportView = function() {
   var picklet_title_txt;
   var panel_count_txt;
   var guides_checkbox;
-  var prompt_save_checkbox;
+  var save_checkbox;
 
   var optimize_btn;
   
@@ -95,7 +95,7 @@ PickletExportView = function() {
       'count': panel_count_txt.text,
       'name': picklet_title_txt.text,
       'guides': guides_checkbox.value,
-      'save': prompt_save_checkbox.value
+      'save': save_checkbox.value
     };
     put_options();
     var group = main_window.add("group{\
@@ -111,10 +111,8 @@ PickletExportView = function() {
         title:EditText{name:'title_txt',characters:15,active:true},\
       },\
     }}");
-    /*
     main_window.close();
     controller.createPicklet(properties);
-    */
   };
 
   var closeWindow = function() {
@@ -200,8 +198,8 @@ PickletExportView = function() {
     /// label for option to prompt the user to save the newly created document
     e.save_label.text = _("Prompt to save:");
 
-    prompt_save_checkbox = e.save_checkbox;
-    prompt_save_checkbox.value = global_options.get('prompt_save', true);
+    save_checkbox = e.save_checkbox;
+    save_checkbox.value = global_options.get('prompt_save', true);
 
     create_btn = e.create_btn;
     create_btn.addEventListener('click', createPicklet);
@@ -611,8 +609,7 @@ PickletExportView = function() {
         },\
       }");
 
-      // content views corresponding to actions are lazy loaded
-      // in actions_list handler updateActionDisplay
+      // content views corresponding to actions are initialized here
       getCreateGroup();
       getExportGroup();
       getOptimizeGroup();
@@ -674,10 +671,9 @@ PickletExportView = function() {
   
   var put_options = function() {
     // get CustomOptions to save their storable options.
-    if (group_create) {
-      global_options.set('include_guides', group_create.guides_checkbox.value);
-      global_options.set('prompt_save', group_create.save_checkbox.value);
-    }
+    global_options.set('include_guides', guides_checkbox.value);
+    global_options.set('prompt_save', save_checkbox.value);
+
     global_options.set('language', selected_language);
 
     global_options.put();
