@@ -1,16 +1,16 @@
-PickletDocument = function(w, h, n) {
-  var width = w;
-  var height = h;
-  var name = n;
-
-  return {
-    width: width,
-    height: height,
-    name: name
-  };
-};
-
 PickletExportController = function() {
+  var PickletDocument = function(w, h, n) {
+    var width = w;
+    var height = h;
+    var name = n;
+
+    return {
+      width: width,
+      height: height,
+      name: name
+    };
+  };
+
   return {
     exportPicklet: function() {
       
