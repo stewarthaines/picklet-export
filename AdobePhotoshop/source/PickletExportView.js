@@ -8,6 +8,7 @@ PickletExportView = function() {
   ];
 
   var main_window;
+  var save_units;
   var close_btn;
 
   // sidebar
@@ -98,21 +99,107 @@ PickletExportView = function() {
       'save': save_checkbox.value
     };
     put_options();
-    var group = main_window.add("group{\
-    orientation:'column',\
-    alignment:'top',\
-    visible:false,\
-    panel:Panel{\
-      minimumSize:[300,100],\
-      margins:[5, 16, 5, 10],\
-      alignChildren:'right',\
-      title:Group{\
-        label_title:StaticText{name:'title_label'},\
-        title:EditText{name:'title_txt',characters:15,active:true},\
-      },\
-    }}");
     main_window.close();
     controller.createPicklet(properties);
+  };
+
+  var doExport = function() {
+    // duplicate the document because it's going to get changed
+    var destination = destination_txt.text;
+    if (slug_checkbox.value) {
+      destination += '/' + slug_input_txt.text;
+    }
+    var folder = new Folder(destination);
+    if (!folder.exists) {
+      folder.create();
+    }
+    var path_components = destination.split('/');
+    var slug = path_components[path_components.length - 1];
+    put_options();
+    main_window.close();
+    if (!covers_checkbox.value
+      && !layers_checkbox.value
+      && !template_checkbox.value
+      && !thumbnails_checkbox.value) {
+        // there's nothing to do
+      } else {
+        try {
+          var duplicate;
+          if (covers_checkbox.value) {
+            // use original document because exportCovers() won't modify it
+            if (!duplicate) duplicate = app.activeDocument.duplicate();
+            var properties = {
+              'panels': panels_list.selection,
+              'doc': duplicate,
+              'destination': destination,
+              'name': document_name,
+              'type': image_types_list.selection.index,
+              'quality': cover_quality_txt.text,
+            };
+            controller.exportCovers(properties);
+          }
+          if (layers_checkbox.value) {
+            // duplicate the active document because exportLayers() is going to mess with it
+            // FIXME:
+            // log and display this condition
+            if (!panels_list.selection) return;
+
+            if (!duplicate) duplicate = app.activeDocument.duplicate();
+            var properties = {
+              'panels': panels_list.selection,
+              'doc': duplicate,
+              'destination': destination,
+              'slug': slug,
+            };
+            if (fullsize_checkbox.value) {
+              properties['prefix'] = '/x2';
+              controller.exportLayers(properties);
+            }
+            duplicate.resizeImage(320, 480);
+            properties['prefix'] = '';
+            controller.exportLayers(properties);
+          }
+          if (template_checkbox.value) {
+            var properties = {
+              'doc': app.activeDocument,
+              'destination': destination,
+              'json_filename': template_name_txt.text,
+              'slug': slug,
+            };
+            controller.exportJSON(properties);
+          }
+          if (thumbnails_checkbox.value) {
+            // only create a new duplicate if it wasn't created for layers export
+            if (!duplicate) duplicate = app.activeDocument.duplicate();
+            var properties = {
+              'panels': panels_list.selection,
+              'doc': duplicate,
+              'destination': destination,
+              'name': document_name,
+            };
+            controller.exportThumbnails(properties);
+          }
+        } catch(e) {
+          // alert(e);
+          alert('Error\n ' + e.fileName + ' line ' + e.line + '\n' + e.message);
+        } finally {
+          if (duplicate) {
+            duplicate.close(SaveOptions.DONOTSAVECHANGES);
+          }
+        }
+      }
+  };
+
+  var getDestination = function() {
+    var prompt = _("Export picklet files to");
+
+    var testFolder = new Folder(destination_txt.text);
+    if (destination_txt.text == '' || !testFolder.exists) destination_txt.text = "~";
+    var selFolder = Folder.selectDialog(prompt, destination_txt.text);
+    if (selFolder != null) {
+        destination_txt.text = selFolder.fsName;
+    }
+    main_window.defaultElement.active = true;
   };
 
   var closeWindow = function() {
@@ -123,6 +210,81 @@ PickletExportView = function() {
   var changeLanguage = function() {
     selected_language = language_list.selection.code;
     reset();
+  };
+  
+  var getLayerCompSelection = function() {
+    var selection = [];
+    if (app.documents.length > 0) {
+      for (var i = 0; i < app.activeDocument.layerComps.length; i++) {
+        comp = app.activeDocument.layerComps[i];
+        if (comp.selected) {
+          selection[selection.length] = comp.name;
+        }
+      }
+    }
+    return selection;
+  };
+
+
+  var contains = function(a, obj) {
+      var i = a.length;
+      while (i--) {
+         if (a[i] === obj) {
+             return true;
+         }
+      }
+      return false;
+  };
+  
+  var initPanelsList = function() {
+    // use either the panel selection from last run
+    // or, if the layercomp selection has changed use that.
+    var stored_comp_selection = document_options.get('layer_comp_selection', '');
+    var selection = getLayerCompSelection();
+    var use_current = false;
+    if (stored_comp_selection != selection.join(',')) {
+      // layercomp selection changed. use it.
+      use_current = true;
+    }
+    var stored_panel_selection = document_options.get('panel_selection', stored_comp_selection);
+    
+    // show an entry in this dropdown list for each layer comp (ignore 'cover')
+    var item;
+    if (app.documents.length > 0 && app.activeDocument) {
+      var comp;
+      var selected = [];
+      var stored_panels = stored_panel_selection.split(',');
+      for (var i = 0; i < app.activeDocument.layerComps.length; i++) {
+        comp = app.activeDocument.layerComps[i];
+        if (comp.name != 'cover') { // ignore 'cover' layer comp
+          item = panels_list.add('item', comp.name);
+          if (use_current) {
+            if (comp.selected) {
+              selected[selected.length] = item;
+            }
+          } else {
+            if (contains(stored_panels, comp.name)) {
+              selected[selected.length] = item;
+            }
+          }
+        }
+      }
+      panels_list.selection = selected;
+    } else {
+      item = panels_list.add('item', 'No panels');
+      panels_list.enabled = false;
+      // panels_list.selection = item; // should be persisted in document_options
+    }
+  };
+
+  var updatePanelsList = function() {
+/*    for (var i = 0; i < app.activeDocument.layerComps.length; i++) {
+      if (indexOf(panels_list.selection, app.activeDocument.layerComps[i].name) != -1) {
+        // app.activeDocument.layerComps[i].selected = true;
+      } else {
+        // app.activeDocument.layerComps[i].selected = false;
+      }
+    }*/
   };
   
   var getCreateGroup = function() {
@@ -138,14 +300,14 @@ PickletExportView = function() {
       alignChildren:'right',\
       title:Group{\
         label_title:StaticText{name:'title_label'},\
-        title:EditText{name:'title_txt',characters:15,active:true},\
+        title:EditText{name:'title_txt',characters:25,active:true},\
       },\
       panel_count:Group{\
         label_panel_count:StaticText{name:'panel_count_label'},\
         thing:Group{\
           orientation:'stack',\
           alignment:'left',\
-          text_title:EditText{characters:15,visible:false},\
+          text_title:EditText{characters:25,visible:false},\
           text_panel_count:EditText{name:'text_panel_count',characters:4,alignment:'left'},\
         },\
       },\
@@ -154,7 +316,7 @@ PickletExportView = function() {
         thing:Group{\
           orientation:'stack',\
           alignment:'left',\
-          text_title:EditText{characters:15,visible:false},\
+          text_title:EditText{characters:25,visible:false},\
           checkbox:Checkbox{name:'guides_checkbox',alignment:'left'},\
         }\
       },\
@@ -163,7 +325,7 @@ PickletExportView = function() {
         thing:Group{\
           orientation:'stack',\
           alignment:'left',\
-          text_save:EditText{characters:15,visible:false},\
+          text_save:EditText{characters:25,visible:false},\
           checkbox:Checkbox{name:'save_checkbox',alignment:'left'},\
         }\
       },\
@@ -230,71 +392,50 @@ PickletExportView = function() {
             orientation:'row',\
             alignment:'left',\
             cover_check:Checkbox{name:'cover_check'},\
-            cover_label:StaticText{name:'cover_label'},\
-          }\
-          group1:Group{\
-            orientation:'row',\
-            alignment:'right',\
             list:DropDownList{name:'image_types_list'},\
-            input:EditText{name:'cover_image_jpeg_quality',characters:4},\
+            input:EditText{name:'cover_quality',characters:4},\
           }\
           group2:Group{\
             orientation:'row',\
             alignment:'left',\
             template_check:Checkbox{name:'template_check'},\
-            template_label:StaticText{name:'template_label'},\
-          }\
-          group3:Group{\
-            orientation:'row',\
-            alignment:'right',\
             input:EditText{name:'template_name_txt',characters:12},\
           }\
           group4:Group{\
             orientation:'row',\
             alignment:'left',\
             layers_check:Checkbox{name:'layers_check'},\
-            layers_label:StaticText{name:'layers_label'},\
-          },\
-          group5:Group{\
-            orientation:'row',\
-            alignment:'left',\
-            margins:[30,0,0,0],\
             fullsize_check:Checkbox{name:'fullsize_check'},\
-            fullsize_label:StaticText{name:'fullsize_label'},\
-          },\
-        }\
-        group1:Group{\
-          orientation:'column',\
-          alignChildren:'fill',\
-          group:Group{\
-            orientation:'column',\
-            margins:[5, 0, 5, 0],\
-            alignment:'fill',\
-            list0:DropDownList{name:'panels_list',alignment:'fill'},\
           },\
           thumb:Group{\
             orientation:'row',\
             alignment:'left',\
             thumbnails_check:Checkbox{name:'thumbnails_check'},\
-            thumbnails_label:StaticText{name:'thumbnails_label'},\
           }\
-          list1:ListBox{preferredSize:[150, 103], properties:{scrolling:true}},\
+        }\
+        group1:Group{\
+          orientation:'column',\
+          alignChildren:'fill',\
+          label:StaticText{name:'panels_label'},\
+          list1:ListBox{name:'panels_list',preferredSize:[150, 123], properties:{multiselect:true,scrolling:true}},\
         }\
       }\
-      destination_label:StaticText{name:'destination_label',alignment:'left'},\
+      group_aa:Group{\
+        alignment:'left',\
+        destination_label:StaticText{name:'destination_label',alignment:'left'},\
+        button:Button{name:'browse_btn',alignment:'right'},\
+      },\
       group1:Group{\
         alignment:'fill',\
         group0:Group{\
-          destination_input:EditText{characters:20}\
-          button:Button{name:'browse_btn',alignment:'right'},\
+          destination_input:EditText{name:'destination_txt',enabled:false,characters:42}\
         }\
       }\
       group2:Group{\
         alignment:'fill',\
         slug:Group{\
           checkbox:Checkbox{name:'slug_check'},\
-          label:StaticText{name:'slug_label'},\
-          input:EditText{name:'slug_input',characters:12},\
+          input:EditText{name:'slug_input',characters:20},\
         }\
       }\
       button:Button{name:'export_btn',alignment:'right'},\
@@ -303,66 +444,122 @@ PickletExportView = function() {
 
     var e = ElementMap(group);
 
-    /// label for option to include cover image in export
-    e.cover_label.text = _("Cover image");
+    /// label for group controls related to exporting picklet files
+    e.panel.text = _("Export '%s'").replace('%s', document_name);
 
-    cover_image_checkbox = e.cover_check;
-    cover_image_checkbox.value = document_options.get('cover_image', true);
+    covers_checkbox = e.cover_check;
+    covers_checkbox.value = document_options.get('cover_image', true);
+
+    /// label for option to include cover image in export
+    e.cover_check.text = _("Covers");
 
     image_types_list = e.image_types_list;
     item = image_types_list.add('item', 'JPEG');
-    image_types_list.selection = item;
+    // image_types_list.selection = item;
+    item = image_types_list.add('item', 'PNG_8');
+    image_types_list.enabled = covers_checkbox.value;
 
-    e.cover_image_jpeg_quality.text = '8';
+    cover_types_selection = document_options.get('cover_image_type', 0);
+    image_types_list.selection = cover_types_selection; //image_types_list.items[cover_types_selection];
+
+    cover_quality_txt = e.cover_quality;
+    cover_quality_txt.text = document_options.get('cover_jpeg_quality', '8');
+    cover_quality_txt.enabled = covers_checkbox.value;
+
+    cover_quality_txt.addEventListener('change', function() {
+      // bounds checking 0 - 10
+      if (parseFloat(this.text, 10) <= 0) { this.text = '1'; }
+      else if (parseFloat(this.text, 10) >= 10) { this.text = '10'; }
+      else if (! parseFloat(this.text, 10)) { this.text = '8'; }
+    });
+
+    covers_checkbox.addEventListener('click', function() {
+      // just update appearance
+      image_types_list.enabled = this.value;
+      cover_quality_txt.enabled = this.value;
+    });
+
+    image_types_list.addEventListener('change', function() {
+      cover_quality_txt.visible = (0 == this.selection.index);
+    });
 
     /// label for option to include the template file in export
-    e.template_label.text = _("Template file");
+    e.template_check.text = _("Template file");
 
     template_checkbox = e.template_check;
     template_checkbox.value = document_options.get('template', true);
 
     template_name_txt = e.template_name_txt;
-    template_name_txt.text = "picklet.json";
+    template_name_txt.text = document_options.get('template_json', 'picklet.json');
+    template_name_txt.enabled = template_checkbox.value;
+
+    template_checkbox.addEventListener('click', function() {
+      // just update appearance
+      template_name_txt.enabled = this.value;
+    });
 
     /// label for option to include layer images in export
-    e.layers_label.text = _("Layers");
+    e.layers_check.text = _("Layers");
 
     layers_checkbox = e.layers_check;
     layers_checkbox.value = document_options.get('layers', true);
 
     /// label for option to include fullsize layer images in export
-    e.fullsize_label.text = _("Fullsize");
+    e.fullsize_check.text = _("include fullsize");
 
     fullsize_checkbox = e.fullsize_check;
     fullsize_checkbox.value = document_options.get('fullsize', true);
+    fullsize_checkbox.enabled = layers_checkbox.value;
+
+    layers_checkbox.addEventListener('click', function() {
+      fullsize_checkbox.enabled = this.value;
+    });
+
+    /// label for list displaying panel names
+    e.panels_label.text = _("Panels to export:");
 
     panels_list = e.panels_list;
-    item = panels_list.add('item', 'Panels');
-    panels_list.selection = item;
+    panels_list.addEventListener('change', updatePanelsList);
     
     thumbnails_checkbox = e.thumbnails_check;
     thumbnails_checkbox.value = document_options.get('thumbnails', true);
 
     /// label for option to include panel thumbnail images in export
-    e.thumbnails_label.text = _("Thumbnails");
+    thumbnails_checkbox.text = _("Thumbnails");
 
-    /// label for group controls related to exporting picklet files
-    e.panel.text = _("Export '%s'").replace('%s', document_name);
+    // selection_list = e.selection_list;
 
     /// label for input to save files to destination directory
-    e.destination_label.text = _("Export to destination:");
+    e.destination_label.text = _("Save to (usually in ~/Dropbox/Public):");
+
+    destination_txt = e.destination_txt;
+    var global_destination = global_options.get('destination', '~');
+    var destination = new Folder(document_options.get('destination', global_destination));
+    destination_txt.text = destination.fsName;
 
     /// label for button to browse for destination directory 
     e.browse_btn.text = _("Browse...");
+    e.browse_btn.addEventListener('click', getDestination);
 
-    e.slug_check.value = document_options.get('as_slug', true)
+    slug_checkbox = e.slug_check;
+    slug_checkbox.value = document_options.get('as_slug', true)
 
     /// label for option to use named sub-directory below the destination directory
-    e.slug_label.text = _("in folder:");
+    slug_checkbox.text = _("in folder:");
 
-    e.slug_input.text = "untitled_picklet";
+    slug_input_txt = e.slug_input;
+    var slug = controller.slugify(document_name.replace(/^(.*)\.psd$/i, '$1'));
+    slug_input_txt.text = document_options.get('slug_input', slug);
+    slug_input_txt.enabled = slug_checkbox.value;
+
+    slug_checkbox.addEventListener('click', function() {
+      slug_input_txt.enabled = this.value;
+    });
 
     export_btn = e.export_btn;
+    export_btn.addEventListener('click', function() {
+      app.activeDocument.suspendHistory('Picklet Export', 'doExport()');
+    });
     /// label for button to start the export of picklet files
     export_btn.text = _("Export");
 
@@ -387,7 +584,6 @@ PickletExportView = function() {
           list:DropDownList{name:'layer_export_types'},\
           input:EditText{characters:4, name:'layer_export_quality'},\
           checkbox:Checkbox{name:'layer_export_fullsize'},\
-          label:StaticText{name:'layer_export_label'},\
           button:Button{name:'layer_export_action'},\
         }\
       }\
@@ -406,7 +602,7 @@ PickletExportView = function() {
     layer_export_quality.text = '8';
 
     /// label for option to export fullsize images
-    e.layer_export_label.text = _("Fullsize");
+    e.layer_export_fullsize.text = _("Fullsize");
 
     layer_export_fullsize = e.layer_export_fullsize;
     layer_export_fullsize.value = document_options.get('layer_export_fullsize', true);
@@ -516,7 +712,13 @@ PickletExportView = function() {
     }
 
     document_options = new CustomOptions('Picklet-Settings-' + document_name);
-    action_selection = document_options.get('action_display', 0);
+
+    if (app.documents.length > 0) {
+      action_selection = document_options.get('action_display', 0);
+    } else {
+      // default to displaying 'create' if there's no open document
+      action_selection = 0;
+    }
 
     /*
     In case you're curious, my principle in deciding how to create these
@@ -597,7 +799,8 @@ PickletExportView = function() {
       /// label for review action
       actions_list.add('item', _("Review"));
 
-      actions_list.selection = document_options.get('action_display', 0);
+      // actions_list.selection = document_options.get('action_display', 0);
+      actions_list.selection = action_selection;
       actions_list.addEventListener('change', updateActionDisplay);
 
       // group_action holds the groups corresponding to the radio button selection
@@ -625,8 +828,13 @@ PickletExportView = function() {
         groups[i] = null;
       }
     }
-    init(); // need to recreate the controls so autolayout works
+    init(); // recreate the interface so autolayout accounts for localized labels
     actions_list.notify('onChange');
+    initPanelsList();
+    if (app.documents.length == 0) {
+      groups['export'].enabled = false;
+      groups['optimize'].enabled = false;
+    }
     main_window.show();
   };
 
@@ -662,7 +870,14 @@ PickletExportView = function() {
     }
 
     groups[names[action_selection]].visible = true;
-    main_window.defaultElement = actions[action_selection];
+    if (groups[names[action_selection]].enabled) {
+      main_window.defaultElement = actions[action_selection];
+    } else {
+      main_window.defaultElement = null;
+    }
+
+    // individual visible toggles
+    cover_quality_txt.visible = (image_types_list.selection == 0);
 
     actions_list.selection = action_selection;
     actions_list.active = true; // set keyboard focus to the list
@@ -673,6 +888,7 @@ PickletExportView = function() {
     // get CustomOptions to save their storable options.
     global_options.set('include_guides', guides_checkbox.value);
     global_options.set('prompt_save', save_checkbox.value);
+    global_options.set('destination', destination_txt.text); // use as default for new documents
 
     global_options.set('language', selected_language);
 
@@ -680,13 +896,42 @@ PickletExportView = function() {
 
     // store document-level options
     document_options.set('action_display', action_selection);
+    document_options.set('destination', destination_txt.text);
+
+    document_options.set('layer_comp_selection', getLayerCompSelection().join(','));
+    if (panels_list.selection) {
+      document_options.set('panel_selection', panels_list.selection.join(','));
+    } else {
+      document_options.set('panel_selection', '');
+    }
+    document_options.set('cover_image', covers_checkbox.value);
+    document_options.set('cover_jpeg_quality', cover_quality_txt.text);
+    document_options.set('template', template_checkbox.value);
+    document_options.set('template_json', template_name_txt.text);
+    document_options.set('layers', layers_checkbox.value);
+    document_options.set('fullsize', fullsize_checkbox.value);
+    document_options.set('thumbnails', thumbnails_checkbox.value);
+    document_options.set('as_slug', slug_checkbox.value);
+    document_options.set('slug_input', slug_input_txt.text);
+    document_options.set('cover_image_type', image_types_list.selection.index);
 
     document_options.put();
   };
 
   return {
     show: function() {
-      reset();
+      save_units = preferences.rulerUnits;
+      preferences.rulerUnits = Units.PIXELS;
+      try {
+        reset();
+      } catch(e) {
+        var msg = '';
+        for (var i in e) {
+          msg += i + '\n';
+        }
+        alert('Error\n ' + e.fileName + ' line ' + e.line + '\n' + e.message);
+      }
+      preferences.rulerUnits = save_units;
     }
   };
 };
